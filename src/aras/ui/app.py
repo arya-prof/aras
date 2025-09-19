@@ -1,40 +1,27 @@
 """
-Qt application for Aras Agent.
+Headless Qt application for Aras Agent.
 """
 
 import sys
-import argparse
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QIcon
 
-from .main_window import MainWindow
 from .circular_indicator import HeadlessAgentWindow
 from ..config import settings
 
 
 class ArasApp(QApplication):
-    """Main Qt application for Aras Agent."""
+    """Main Qt application for Aras Agent (headless only)."""
     
-    def __init__(self, argv, headless=True):
+    def __init__(self, argv):
         super().__init__(argv)
         self.setApplicationName(settings.agent_name)
         self.setApplicationVersion("0.1.0")
         self.setOrganizationName("Aras Agent")
         
-        # Set application icon (if available)
-        # self.setWindowIcon(QIcon("path/to/icon.png"))
-        
-        self.headless = headless
-        
-        if headless:
-            # Create headless window with circular indicator
-            self.main_window = HeadlessAgentWindow()
-            self.main_window.show()
-        else:
-            # Create full UI window
-            self.main_window = MainWindow()
-            self.main_window.show()
+        # Create headless window with circular indicator
+        self.main_window = HeadlessAgentWindow()
+        self.main_window.show()
         
         # Setup update timer
         self.update_timer = QTimer()
@@ -53,17 +40,7 @@ class ArasApp(QApplication):
             self.main_window.set_agent_status(agent_active)
 
 
-def run_ui(headless=True):
-    """Run the Qt UI application."""
-    app = ArasApp(sys.argv, headless=headless)
-    return app.exec()
-
-
 def run_headless():
     """Run the headless UI with circular indicator."""
-    return run_ui(headless=True)
-
-
-def run_full_ui():
-    """Run the full UI interface."""
-    return run_ui(headless=False)
+    app = ArasApp(sys.argv)
+    return app.exec()

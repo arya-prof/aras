@@ -229,49 +229,41 @@ class HeadlessAgentWindow(QWidget):
         self.indicator.set_voice_listening(self.voice_listening)
     
     def show_home_status(self):
-        """Show the home status popup."""
+        """Show the home status (simplified for headless mode)."""
         # Prevent duplicate processing
         if self._processing_voice_command:
             print("⏭️ Voice command already being processed, skipping...")
             return
         
         self._processing_voice_command = True
-        print("🏠 Opening home status visualization...")
-        
-        # Check if window already exists and is visible
-        if hasattr(self, 'home_window') and self.home_window and self.home_window.isVisible():
-            print("ℹ️ Home visualization window already open, bringing to front...")
-            self.home_window.raise_()
-            self.home_window.activateWindow()
-            self._processing_voice_command = False
-            return
+        print("🏠 Home status requested - running in headless mode")
         
         try:
-            from .home_visualization import HomeVisualizationWindow
-            # Ensure we're on the main thread for Qt operations
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(0, self._create_home_window)
-            print("✅ Home visualization window creation scheduled!")
+            # In headless mode, just print status information
+            self._print_home_status()
+            print("✅ Home status displayed in console")
         except Exception as e:
-            print(f"❌ Error opening home visualization: {e}")
-            import traceback
-            traceback.print_exc()
-            self._processing_voice_command = False
-    
-    def _create_home_window(self):
-        """Create the home window on the main thread."""
-        try:
-            from .home_visualization import HomeVisualizationWindow
-            self.home_window = HomeVisualizationWindow()
-            self.home_window.show()
-            print("✅ Home visualization window opened successfully!")
-        except Exception as e:
-            print(f"❌ Error creating home window: {e}")
+            print(f"❌ Error getting home status: {e}")
             import traceback
             traceback.print_exc()
         finally:
             # Reset the processing flag
             self._processing_voice_command = False
+    
+    def _print_home_status(self):
+        """Print home status to console (headless mode)."""
+        print("\n" + "="*50)
+        print("🏠 HOME STATUS")
+        print("="*50)
+        
+        # This would normally connect to Home Assistant or other smart home systems
+        # For now, show a simple status message
+        print("📊 Smart Home Status:")
+        print("   • Agent: Active")
+        print("   • Voice: Listening")
+        print("   • Mode: Headless")
+        print("   • Note: Full home automation features require Home Assistant setup")
+        print("="*50)
     
     def process_text_command(self, text: str) -> bool:
         """Process a text command and return True if handled."""

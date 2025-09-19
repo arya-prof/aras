@@ -10,13 +10,12 @@ from typing import Dict, List, Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 from loguru import logger
 
 from .config import settings
 from .core.agent import ArasAgent
 from .core.message_handler import MessageHandler
-from .models import UserInput, AgentResponse, ToolCall, ToolResult, StateUpdate, UICommand, ErrorMessage, MessageType, Message
+from .models import UserInput, AgentResponse, ToolCall, ToolResult, StateUpdate, ErrorMessage, MessageType, Message
 from .tools.registry import create_tool_registry
 from .tools.health_monitor import ToolHealthMonitor
 
@@ -35,7 +34,6 @@ class WebSocketManager:
         self.message_handler.subscribe(MessageType.AGENT_RESPONSE, self._handle_agent_response)
         self.message_handler.subscribe(MessageType.TOOL_CALL, self._handle_tool_call)
         self.message_handler.subscribe(MessageType.STATE_UPDATE, self._handle_state_update)
-        self.message_handler.subscribe(MessageType.UI_COMMAND, self._handle_ui_command)
         self.message_handler.subscribe(MessageType.ERROR, self._handle_error)
     
     async def connect(self, websocket: WebSocket):
@@ -106,17 +104,6 @@ class WebSocketManager:
         }
         await self.broadcast(json.dumps(state_data))
     
-    async def _handle_ui_command(self, message: UICommand):
-        """Handle UI command message."""
-        ui_command_data = {
-            "type": "ui_command",
-            "id": message.id,
-            "command": message.command,
-            "parameters": message.parameters,
-            "session_id": message.session_id,
-            "timestamp": message.timestamp.isoformat()
-        }
-        await self.broadcast(json.dumps(ui_command_data))
     
     async def _handle_error(self, message: ErrorMessage):
         """Handle error message."""
@@ -319,16 +306,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 result = await manager.agent.execute_tool(tool_call)
                 await manager.message_handler.publish(result)
             
-            elif message_type == "ui_command":
-                # Handle UI command
-                ui_command = UICommand(
-                    id=message_data.get("id", str(uuid.uuid4())),
-                    command=message_data.get("command"),
-                    parameters=message_data.get("parameters", {}),
-                    session_id=message_data.get("session_id", str(uuid.uuid4()))
-                )
-                
-                await manager.message_handler.publish(ui_command)
             
             else:
                 # Unknown message type
@@ -346,108 +323,16 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-@app.get("/ui")
-async def get_ui():
-    """Get the Qt UI HTML page."""
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Aras Agent UI</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
-            .connected { background-color: #d4edda; color: #155724; }
-            .disconnected { background-color: #f8d7da; color: #721c24; }
-            .messages { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
-            .message { margin: 5px 0; padding: 5px; border-radius: 3px; }
-            .user-message { background-color: #e3f2fd; }
-            .agent-message { background-color: #f3e5f5; }
-            .system-message { background-color: #fff3e0; }
-            .input-area { margin-top: 20px; }
-            input[type="text"] { width: 70%; padding: 10px; }
-            button { padding: 10px 20px; margin-left: 10px; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Aras Agent UI</h1>
-            <div id="status" class="status disconnected">Disconnected</div>
-            <div id="messages" class="messages"></div>
-            <div class="input-area">
-                <input type="text" id="messageInput" placeholder="Type your message here..." />
-                <button onclick="sendMessage()">Send</button>
-            </div>
-        </div>
-        
-        <script>
-            let ws = null;
-            let sessionId = null;
-            
-            function connect() {
-                ws = new WebSocket('ws://localhost:8000/ws');
-                
-                ws.onopen = function(event) {
-                    document.getElementById('status').textContent = 'Connected';
-                    document.getElementById('status').className = 'status connected';
-                    sessionId = Math.random().toString(36).substr(2, 9);
-                };
-                
-                ws.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    addMessage(data.content, data.type);
-                };
-                
-                ws.onclose = function(event) {
-                    document.getElementById('status').textContent = 'Disconnected';
-                    document.getElementById('status').className = 'status disconnected';
-                    setTimeout(connect, 3000);
-                };
-                
-                ws.onerror = function(error) {
-                    console.error('WebSocket error:', error);
-                };
-            }
-            
-            function sendMessage() {
-                const input = document.getElementById('messageInput');
-                const message = input.value.trim();
-                
-                if (message && ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'user_input',
-                        content: message,
-                        input_type: 'text',
-                        session_id: sessionId
-                    }));
-                    
-                    addMessage(message, 'user');
-                    input.value = '';
-                }
-            }
-            
-            function addMessage(content, type) {
-                const messages = document.getElementById('messages');
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message ' + type + '-message';
-                messageDiv.textContent = content;
-                messages.appendChild(messageDiv);
-                messages.scrollTop = messages.scrollHeight;
-            }
-            
-            document.getElementById('messageInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-            
-            connect();
-        </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+@app.get("/")
+async def get_status():
+    """Get the agent status (headless mode)."""
+    return {
+        "status": "running",
+        "mode": "headless",
+        "agent_name": settings.agent_name,
+        "version": "0.1.0",
+        "message": "Aras Agent is running in headless mode. Use the circular indicator for interaction."
+    }
 
 
 @app.on_event("startup")

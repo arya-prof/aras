@@ -1,6 +1,6 @@
 # Aras Agent
 
-A modular AI agent with Qt UI for smart home and system control, built with FastAPI, LangChain, and PyQt6.
+A modular AI agent with headless UI for smart home and system control, built with FastAPI, LangChain, and PyQt6.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ Aras follows a modular, agent-based architecture with the following key componen
 - **Agent Core**: FastAPI server with WebSocket support, LangChain agent, and state management
 - **Modular Tools**: Pluggable tool system for different capabilities (System, Web, Home, Communication, Knowledge, Voice/Vision, Safety)
 - **Service Layer**: External service integrations (Home Assistant, SSH, Vector DB, etc.)
-- **Qt UI**: Rich desktop interface with 3D visualization and real-time updates
+- **Headless UI**: Minimal circular indicator interface with voice control and console output
 
 ## Features
 
@@ -28,12 +28,12 @@ Aras follows a modular, agent-based architecture with the following key componen
 - **Voice & Vision Tools**: Speech processing, image processing, camera control
 - **Safety Tools**: Permission checks, access control, audit logging
 
-### UI Features
-- Ambient hub interface
-- 3D home model visualization
-- Camera viewer
-- Media controls
-- Real-time status updates
+### Headless UI Features
+- Circular status indicator (bottom-right corner)
+- Voice command processing
+- Console-based status display
+- Minimal resource usage
+- Always-on-top indicator
 
 ## Installation
 
@@ -56,7 +56,14 @@ cp .env.example .env
 
 4. Run the agent:
 ```bash
+# Run in headless mode (default)
 python -m aras.main
+
+# Or run server only
+python -m aras.main --mode server
+
+# Or run both server and headless UI
+python -m aras.main --mode both
 ```
 
 ## Configuration
@@ -70,10 +77,11 @@ Configure your environment variables in `.env`:
 
 ## Usage
 
-1. Start the agent server
-2. Launch the Qt UI
-3. Use voice or text input to interact with Aras
-4. Monitor system status and control devices through the interface
+1. Start the agent (runs in headless mode by default)
+2. Look for the circular indicator in the bottom-right corner of your screen
+3. Use voice commands like "What's the home status?" to interact with Aras
+4. Click the indicator or use voice to get status information
+5. Monitor system status through console output and the indicator
 
 ## Development
 

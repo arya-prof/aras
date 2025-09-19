@@ -32,9 +32,8 @@ Pillow>=10.1.0
 speechrecognition>=3.10.0
 pyttsx3>=2.90
 
-# Qt UI
+# Qt UI (headless only)
 PyQt6>=6.6.0
-PyQt6-WebEngine>=6.6.0
 
 # Utilities
 python-dotenv>=1.0.0

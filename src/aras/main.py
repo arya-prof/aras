@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .config import settings
 from .server import app
-from .ui.app import run_ui, run_headless, run_full_ui
+from .ui.app import run_headless
 
 
 def main():
@@ -17,9 +17,9 @@ def main():
     parser = argparse.ArgumentParser(description=f"{settings.agent_name} Agent")
     parser.add_argument(
         "--mode", 
-        choices=["server", "ui", "headless", "both"], 
+        choices=["server", "headless", "both"], 
         default="both",
-        help="Run mode: server only, full UI, headless UI, or both"
+        help="Run mode: server only, headless UI, or both"
     )
     parser.add_argument(
         "--host", 
@@ -43,8 +43,6 @@ def main():
     
     if args.mode == "server":
         run_server(args.host, args.http_port, args.websocket_port)
-    elif args.mode == "ui":
-        run_full_ui()
     elif args.mode == "headless":
         run_headless()
     elif args.mode == "both":
@@ -68,7 +66,7 @@ def run_server(host: str, http_port: int, websocket_port: int):
     print(f"Starting {settings.agent_name} Agent Server")
     print(f"HTTP: http://{host}:{http_port}")
     print(f"WebSocket: ws://{host}:{http_port}/ws")
-    print(f"UI: http://{host}:{http_port}/ui")
+    print(f"Status: http://{host}:{http_port}/")
     
     uvicorn.run(
         app, 
