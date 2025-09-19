@@ -97,35 +97,43 @@ class VoiceCommandHandler(QObject):
     
     def process_voice_command(self, text: str) -> bool:
         """Process a voice command using GPT-4 and return True if handled."""
+        import time
+        command_id = f"cmd_{int(time.time() * 1000)}"
+        
         text = text.strip()
         
-        print(f"You: {text}")
+        print(f"[DEBUG-{command_id}] VOICE_INPUT: You: {text}")
         
         # Try GPT-4 processing first if available
         if self.openai_client:
             try:
+                print(f"[DEBUG-{command_id}] GPT4_PROCESSING: Starting GPT-4 processing")
                 result = self._process_with_gpt4(text)
                 if result['success']:
+                    print(f"[DEBUG-{command_id}] COMMAND_PROCESSED: '{text}' -> {result}")
                     self.command_processed.emit(text, result)
                     
-                    # Speak the response if TTS is available
-                    if result.get('response') and self.tts_engine:
-                        self.speak_response(result['response'])
-                        self.voice_response.emit(result['response'])
-                    
+                    # UI will handle response and TTS from command_processed signal
+                    print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: GPT-4 processing successful")
                     return True
+                else:
+                    print(f"[DEBUG-{command_id}] GPT4_FAILED: GPT-4 processing failed, trying pattern matching")
             except Exception as e:
-                print(f"Error: GPT-4 processing failed: {e}")
+                print(f"[DEBUG-{command_id}] ERROR: GPT-4 processing failed: {e}")
         
         # Fallback to pattern matching
+        print(f"[DEBUG-{command_id}] PATTERN_MATCHING: Starting pattern matching")
         text_lower = text.lower()
         for i, pattern in enumerate(self.compiled_patterns):
             if pattern.search(text_lower):
-                print(f"Matched pattern {i+1}: {self.home_status_patterns[i]}")
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Pattern {i+1}: {self.home_status_patterns[i]}")
+                print(f"[DEBUG-{command_id}] TRIGGER_HOME_STATUS: Triggering home status")
                 self.trigger_home_status()
+                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
         
-        print(f"No patterns matched for: '{text}'")
+        print(f"[DEBUG-{command_id}] NO_MATCH: No patterns matched for: '{text}'")
+        print(f"[DEBUG-{command_id}] PROCESSING_FAILED: Command not recognized")
         return False
     
     def _process_with_gpt4(self, command: str) -> Dict[str, Any]:
@@ -282,7 +290,7 @@ $synth.Dispose()''')
                     except:
                         pass
                     
-                    print(f"Aras: {text}")
+                    print(f"[DEBUG-TTS] WINDOWS_TTS: Aras: {text}")
                     success = True
                     
                 except Exception as e:
@@ -309,9 +317,9 @@ $synth.Dispose()''')
                         except:
                             pass
                         
-                        print(f"Aras: {text}")
+                        print(f"[DEBUG-TTS] PYTTSX3: Aras: {text}")
                         success = True
-                        
+                    
                     except Exception as e:
                         print(f"Error: pyttsx3 failed: {e}")
                 
@@ -323,14 +331,14 @@ $synth.Dispose()''')
                         speaker.Rate = 0
                         speaker.Volume = 100
                         speaker.Speak(text)
-                        print(f"Aras: {text}")
+                        print(f"[DEBUG-TTS] SAPI: Aras: {text}")
                         success = True
                     except Exception as e:
                         print(f"Error: SAPI failed: {e}")
                 
                 # Method 4: Fallback to text output
                 if not success:
-                    print(f"Aras: {text}")
+                    print(f"[DEBUG-TTS] FALLBACK: Aras: {text}")
             
             # Run TTS in separate thread with proper cleanup
             tts_thread = threading.Thread(target=speak_with_persistent_audio)
@@ -432,30 +440,52 @@ class VoiceCommandProcessor:
             print("Error: Voice recognition not available")
             return
         
+        # Stop any existing thread first
+        self.stop_voice_thread()
+        
         self.is_listening = True
         self.is_continuous_mode = True
         
-        if not self.voice_thread or not self.voice_thread.is_alive():
-            self.voice_thread = threading.Thread(target=self._voice_listening_loop)
-            self.voice_thread.daemon = True
-            self.voice_thread.start()
-            print("Continuous voice listening started")
+        self.voice_thread = threading.Thread(target=self._voice_listening_loop)
+        self.voice_thread.daemon = True
+        self.voice_thread.start()
+        print("Continuous voice listening started")
     
     def pause_listening(self):
         """Pause voice listening temporarily."""
         self.is_listening = False
         print("Voice listening paused")
     
+    def is_actually_listening(self):
+        """Check if we're actually listening (thread is alive and flag is true)."""
+        return self.is_listening and self.voice_thread and self.voice_thread.is_alive()
+    
+    def stop_voice_thread(self):
+        """Stop the voice listening thread."""
+        if self.voice_thread and self.voice_thread.is_alive():
+            self.is_listening = False
+            # Give the thread a moment to finish its current iteration
+            self.voice_thread.join(timeout=1)
+            self.voice_thread = None
+            print("Voice thread stopped")
+    
     def resume_listening(self):
         """Resume voice listening."""
         if not self.voice_enabled:
             return
-        self.is_listening = True
-        if not self.voice_thread or not self.voice_thread.is_alive():
+        
+        # Only resume if we're not actually listening
+        if not self.is_actually_listening():
+            # Stop any existing thread first
+            self.stop_voice_thread()
+            
+            self.is_listening = True
             self.voice_thread = threading.Thread(target=self._voice_listening_loop)
             self.voice_thread.daemon = True
             self.voice_thread.start()
-        print("Voice listening resumed")
+            print("Voice listening resumed")
+        else:
+            print("Voice listening already active - skipping resume")
     
     def start_background_listening(self):
         """Start background listening for wake words."""
@@ -519,14 +549,14 @@ class VoiceCommandProcessor:
                 try:
                     # Use Google recognition exactly like awsmarthome
                     text = self.recognizer.recognize_google(audio, language="en-US")
-                    print(f"You: {text}")
                     
                     # Process the recognized text using GPT-4
+                    print(f"[DEBUG-VOICE] PROCESSING_START: Processing recognized text: '{text}'")
                     if self.handler.process_voice_command(text):
-                        print("Voice command processed successfully!")
+                        print("[DEBUG-VOICE] PROCESSING_SUCCESS: Voice command processed successfully!")
                     else:
-                        print(f"Command not recognized: '{text}'")
-                        print("Try: 'home status', 'show system info', 'search for weather', 'send an email'")
+                        print(f"[DEBUG-VOICE] PROCESSING_FAILED: Command not recognized: '{text}'")
+                        print("[DEBUG-VOICE] SUGGESTIONS: Try: 'home status', 'show system info', 'search for weather', 'send an email'")
                         
                 except sr.UnknownValueError:
                     # Speech was unintelligible - this is normal
@@ -603,8 +633,6 @@ class VoiceCommandProcessor:
         """Background listening loop for wake words."""
         if not self.voice_enabled or not self.recognizer or not self.microphone:
             return
-        
-        print("Background listening started - waiting for wake words...")
         
         # Use optimized settings for better speech end detection
         self.recognizer.energy_threshold = 300

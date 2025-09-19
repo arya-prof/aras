@@ -377,39 +377,51 @@ class HeadlessAgentWindow(QWidget):
     
     def on_command_processed(self, command: str, result: dict):
         """Handle command processed signal."""
-        print(f"Command processed: '{command}' -> {result}")
+        import time
+        timestamp = int(time.time() * 1000)
+        print(f"[DEBUG-UI-{timestamp}] COMMAND_PROCESSED: '{command}' -> {result}")
         self.indicator.set_last_command(command)
         
         # Set processing state briefly
         self.voice_processing = True
         self.indicator.set_voice_processing(True)
         self.update_status_text()
+        print(f"[DEBUG-UI-{timestamp}] UI_STATE_UPDATE: Voice processing state set to True")
         
         # Reset processing state after a short delay
         QTimer.singleShot(2000, lambda: self.set_voice_processing_false())
+        print(f"[DEBUG-UI-{timestamp}] UI_TIMER_SET: Processing state reset timer set for 2000ms")
+        
+        # Handle response immediately to avoid duplication with voice_response signal
+        if result.get('response'):
+            print(f"[DEBUG-UI-{timestamp}] IMMEDIATE_RESPONSE: Handling response from command_processed")
+            self.indicator.set_last_response(result['response'])
+            
+            # Handle TTS
+            if hasattr(self, 'voice_processor') and hasattr(self.voice_processor, 'handler'):
+                print(f"[DEBUG-UI-{timestamp}] TTS_HANDLING: Speaking response via command_processed")
+                self.voice_processor.handler.speak_response(result['response'])
     
     def on_voice_response(self, response: str):
-        """Handle voice response signal."""
-        print(f"Aras: {response}")
-        self.indicator.set_last_response(response)
+        """Handle voice response signal - DISABLED to avoid duplication."""
+        import time
+        timestamp = int(time.time() * 1000)
+        print(f"[DEBUG-UI-{timestamp}] VOICE_RESPONSE_IGNORED: Duplicate response ignored - handled in command_processed")
+        # Response is now handled in on_command_processed to avoid duplication
         # Note: Speaking state is now handled by speaking_started/speaking_stopped signals
     
     def on_speaking_started(self):
         """Handle speaking started signal."""
         self.voice_responding = True
         self.indicator.set_voice_responding(True)
-        # Temporarily disable voice listening while speaking
-        if hasattr(self.voice_processor, 'pause_listening'):
-            self.voice_processor.pause_listening()
+        # Don't pause listening - let it run continuously
         self.update_status_text()
     
     def on_speaking_stopped(self):
         """Handle speaking stopped signal."""
         self.voice_responding = False
         self.indicator.set_voice_responding(False)
-        # Re-enable voice listening after speaking
-        if hasattr(self.voice_processor, 'resume_listening'):
-            self.voice_processor.resume_listening()
+        # Don't resume listening - it should already be running continuously
         self.update_status_text()
     
     def set_voice_processing_false(self):
