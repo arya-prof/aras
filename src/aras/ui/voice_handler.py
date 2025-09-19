@@ -51,7 +51,7 @@ class VoiceCommandHandler(QObject):
             if voices:
                 # Use the first available voice
                 self.tts_engine.setProperty('voice', voices[0].id)
-                print(f"🔊 TTS initialized with voice: {voices[0].name}")
+                print(f"TTS initialized with voice: {voices[0].name}")
         except ImportError:
             print("pyttsx3 not available for TTS")
         
@@ -97,7 +97,7 @@ class VoiceCommandHandler(QObject):
         """Process a voice command using GPT-4 and return True if handled."""
         text = text.strip()
         
-        print(f"🎤 Processing voice command: '{text}'")
+        print(f"You: {text}")
         
         # Try GPT-4 processing first if available
         if self.openai_client:
@@ -113,17 +113,17 @@ class VoiceCommandHandler(QObject):
                     
                     return True
             except Exception as e:
-                print(f"❌ GPT-4 processing failed: {e}")
+                print(f"Error: GPT-4 processing failed: {e}")
         
         # Fallback to pattern matching
         text_lower = text.lower()
         for i, pattern in enumerate(self.compiled_patterns):
             if pattern.search(text_lower):
-                print(f"✅ Matched pattern {i+1}: {self.home_status_patterns[i]}")
+                print(f"Matched pattern {i+1}: {self.home_status_patterns[i]}")
                 self.trigger_home_status()
                 return True
         
-        print(f"❌ No patterns matched for: '{text}'")
+        print(f"No patterns matched for: '{text}'")
         return False
     
     def _process_with_gpt4(self, command: str) -> Dict[str, Any]:
@@ -277,11 +277,11 @@ $synth.Dispose()''')
                     except:
                         pass
                     
-                    print(f"🔊 Spoke (Windows TTS): {text}")
+                    print(f"Aras: {text}")
                     success = True
                     
                 except Exception as e:
-                    print(f"❌ Windows TTS failed: {e}")
+                    print(f"Error: Windows TTS failed: {e}")
                 
                 # Method 2: Try pyttsx3 with forced cleanup
                 if not success:
@@ -304,11 +304,11 @@ $synth.Dispose()''')
                         except:
                             pass
                         
-                        print(f"🔊 Spoke (pyttsx3): {text}")
+                        print(f"Aras: {text}")
                         success = True
                         
                     except Exception as e:
-                        print(f"❌ pyttsx3 failed: {e}")
+                        print(f"Error: pyttsx3 failed: {e}")
                 
                 # Method 3: Try Windows SAPI directly
                 if not success:
@@ -318,14 +318,14 @@ $synth.Dispose()''')
                         speaker.Rate = 0
                         speaker.Volume = 100
                         speaker.Speak(text)
-                        print(f"🔊 Spoke (SAPI): {text}")
+                        print(f"Aras: {text}")
                         success = True
                     except Exception as e:
-                        print(f"❌ SAPI failed: {e}")
+                        print(f"Error: SAPI failed: {e}")
                 
                 # Method 4: Fallback to text output
                 if not success:
-                    print(f"📝 Text response: {text}")
+                    print(f"Aras: {text}")
             
             # Run TTS in separate thread with proper cleanup
             tts_thread = threading.Thread(target=speak_with_persistent_audio)
@@ -339,8 +339,8 @@ $synth.Dispose()''')
             time.sleep(0.5)
             
         except Exception as e:
-            print(f"❌ TTS error: {e}")
-            print(f"📝 Text response: {text}")
+            print(f"Error: TTS error: {e}")
+            print(f"Aras: {text}")
     
     def process_text_command(self, text: str) -> bool:
         """Process a text command (same as voice but for text input)."""
@@ -348,10 +348,10 @@ $synth.Dispose()''')
     
     def trigger_home_status(self):
         """Trigger the home status visualization."""
-        print("🎯 Triggering home status visualization...")
+        print("Triggering home status visualization...")
         # Emit the signal to trigger home status
         self.home_status_requested.emit()
-        print("📡 Signal emitted for home status")
+        print("Signal emitted for home status")
 
 
 class VoiceCommandProcessor:
@@ -377,19 +377,19 @@ class VoiceCommandProcessor:
                 # Use WO Mic device (same as Chrome) for better compatibility
                 self.microphone = sr.Microphone(device_index=1)  # WO Mic Device
                 self.voice_enabled = True
-                print("🎤 Voice recognition initialized with WO Mic device")
+                print("Voice recognition initialized with WO Mic device")
             except Exception as e:
-                print(f"❌ Failed to initialize voice recognition: {e}")
+                print(f"Error: Failed to initialize voice recognition: {e}")
                 # Fallback to default microphone
                 try:
                     self.microphone = sr.Microphone()
                     self.voice_enabled = True
-                    print("🎤 Voice recognition initialized with default microphone")
+                    print("Voice recognition initialized with default microphone")
                 except Exception as e2:
-                    print(f"❌ Failed to initialize with default microphone: {e2}")
+                    print(f"Error: Failed to initialize with default microphone: {e2}")
                     self.voice_enabled = False
         else:
-            print("❌ Speech recognition libraries not available. Install speechrecognition and pyaudio.")
+            print("Error: Speech recognition libraries not available. Install speechrecognition and pyaudio.")
             self.voice_enabled = False
         
         # Initialize microphone like awsmarthome
@@ -413,15 +413,15 @@ class VoiceCommandProcessor:
                 self.recognizer.non_speaking_duration = 0.8
                 
                 self._microphone_initialized = True
-                print(f"🎤 Microphone initialized successfully. Energy threshold: {self.recognizer.energy_threshold}")
+                print(f"Microphone initialized successfully. Energy threshold: {self.recognizer.energy_threshold}")
             except Exception as e:
-                print(f"❌ Microphone not available: {e}")
+                print(f"Error: Microphone not available: {e}")
                 self.microphone = None
     
     def start_listening(self):
         """Start listening for voice commands in continuous mode."""
         if not self.voice_enabled:
-            print("❌ Voice recognition not available")
+            print("Error: Voice recognition not available")
             return
         
         self.is_listening = True
@@ -431,12 +431,12 @@ class VoiceCommandProcessor:
             self.voice_thread = threading.Thread(target=self._voice_listening_loop)
             self.voice_thread.daemon = True
             self.voice_thread.start()
-            print("🎤 Continuous voice listening started")
+            print("Continuous voice listening started")
     
     def start_background_listening(self):
         """Start background listening for wake words."""
         if not self.voice_enabled:
-            print("❌ Voice recognition not available")
+            print("Error: Voice recognition not available")
             return
         
         if self.is_background_listening:
@@ -447,7 +447,7 @@ class VoiceCommandProcessor:
             self.background_thread = threading.Thread(target=self._background_listening_loop)
             self.background_thread.daemon = True
             self.background_thread.start()
-            print("🎤 Background listening started - waiting for wake words...")
+            print("Background listening started - waiting for wake words...")
             print("   Try: 'Hey Aras', 'Hi Aras', 'Hello', or 'Can you hear me'")
     
     def stop_listening(self):
@@ -458,7 +458,7 @@ class VoiceCommandProcessor:
         if self.voice_thread and self.voice_thread.is_alive():
             self.voice_thread.join(timeout=1)
             self.voice_thread = None
-            print("🎤 Voice listening stopped")
+            print("Voice listening stopped")
     
     def stop_background_listening(self):
         """Stop background listening."""
@@ -467,7 +467,7 @@ class VoiceCommandProcessor:
         if self.background_thread and self.background_thread.is_alive():
             # Don't join the thread to avoid threading issues
             self.background_thread = None
-            print("🎤 Background listening stopped")
+            print("Background listening stopped")
     
     def check_for_commands(self):
         """Check for voice commands (placeholder for actual voice recognition)."""
@@ -479,7 +479,7 @@ class VoiceCommandProcessor:
         if not self.voice_enabled or not self.recognizer or not self.microphone:
             return
         
-        print(f"🎤 Voice recognition started. Energy threshold: {self.recognizer.energy_threshold}")
+        print(f"Voice recognition started. Energy threshold: {self.recognizer.energy_threshold}")
         print("Available commands: 'home status', 'show system info', 'search for weather', etc.")
         
         while self.is_listening:
@@ -492,29 +492,29 @@ class VoiceCommandProcessor:
                 try:
                     # Use Google recognition exactly like awsmarthome
                     text = self.recognizer.recognize_google(audio, language="en-US")
-                    print(f"🎤 Heard: '{text}'")
+                    print(f"You: {text}")
                     
                     # Process the recognized text using GPT-4
                     if self.handler.process_voice_command(text):
-                        print("✅ Voice command processed successfully!")
+                        print("Voice command processed successfully!")
                     else:
-                        print(f"❌ Command not recognized: '{text}'")
-                        print("💡 Try: 'home status', 'show system info', 'search for weather', 'send an email'")
+                        print(f"Command not recognized: '{text}'")
+                        print("Try: 'home status', 'show system info', 'search for weather', 'send an email'")
                         
                 except sr.UnknownValueError:
                     # Speech was unintelligible - this is normal
                     pass
                 except sr.RequestError as e:
-                    print(f"❌ Speech recognition service error: {e}")
+                    print(f"Error: Speech recognition service error: {e}")
                 except Exception as e:
-                    print(f"❌ Unexpected error: {e}")
+                    print(f"Error: Unexpected error: {e}")
                     
             except sr.WaitTimeoutError:
                 # This is normal - just continue listening
                 pass
             except Exception as e:
                 if "timeout" not in str(e).lower():
-                    print(f"❌ Error in voice listening loop: {e}")
+                    print(f"Error: Error in voice listening loop: {e}")
                 time.sleep(0.5)  # Short wait before retrying
     
     def process_audio_input(self, audio_data: bytes) -> bool:
@@ -528,7 +528,7 @@ class VoiceCommandProcessor:
             text = self.recognizer.recognize_google(audio).lower()
             return self.process_text_input(text)
         except Exception as e:
-            print(f"Error processing audio input: {e}")
+            print(f"Error: Error processing audio input: {e}")
             return False
     
     def process_text_input(self, text: str) -> bool:
@@ -544,7 +544,7 @@ class VoiceCommandProcessor:
         if not self.voice_enabled or not self.recognizer or not self.microphone:
             return
         
-        print("🎤 Background listening started - waiting for wake words...")
+        print("Background listening started - waiting for wake words...")
         
         # Use the working settings from before
         self.recognizer.energy_threshold = 300
@@ -564,7 +564,7 @@ class VoiceCommandProcessor:
                 try:
                     # Recognize speech using the same approach as awsmarthome
                     text = self.recognizer.recognize_google(audio, language="en-US").lower()
-                    print(f"🎤 Background heard: '{text}'")
+                    print(f"Background heard: '{text}'")
                     
                     # Check for wake words (very flexible matching)
                     wake_words = [
@@ -574,7 +574,7 @@ class VoiceCommandProcessor:
                         'can you hear me', 'hello hello', 'hello'
                     ]
                     if any(wake_word in text for wake_word in wake_words):
-                        print(f"🎤 Wake word detected: '{text}'")
+                        print(f"Wake word detected: '{text}'")
                         
                         # Stop background listening (don't join thread)
                         self.is_background_listening = False
@@ -592,9 +592,9 @@ class VoiceCommandProcessor:
                     # No speech detected - this is normal
                     pass
                 except sr.RequestError as e:
-                    print(f"❌ Background speech recognition error: {e}")
+                    print(f"Error: Background speech recognition error: {e}")
                 except Exception as e:
-                    print(f"❌ Background listening error: {e}")
+                    print(f"Error: Background listening error: {e}")
                     
             except sr.WaitTimeoutError:
                 # This is normal - just continue listening
@@ -602,7 +602,7 @@ class VoiceCommandProcessor:
             except Exception as e:
                 # Only show non-timeout errors
                 if "timeout" not in str(e).lower():
-                    print(f"❌ Error in background listening loop: {e}")
+                    print(f"Error: Error in background listening loop: {e}")
                 time.sleep(0.5)
         
-        print("🎤 Background listening ended")
+        print("Background listening ended")

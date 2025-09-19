@@ -17,7 +17,7 @@ def main():
     """Run ARAS in headless mode with voice capabilities."""
     try:
         from aras.ui.app import run_headless
-        print("🚀 Starting ARAS Agent with Enhanced Voice Control")
+        print("Starting ARAS Agent with Enhanced Voice Control")
         print("=" * 50)
         print("Voice Commands:")
         print("  - Say 'Hey Aras' or 'Hi Aras' to activate")
@@ -30,11 +30,11 @@ def main():
         run_headless()
         
     except ImportError as e:
-        print(f"❌ Import error: {e}")
+        print(f"Error: Import error: {e}")
         print("Please install required dependencies:")
         print("  pip install -r requirements.txt")
     except Exception as e:
-        print(f"❌ Error starting ARAS: {e}")
+        print(f"Error: Error starting ARAS: {e}")
         import traceback
         traceback.print_exc()
 

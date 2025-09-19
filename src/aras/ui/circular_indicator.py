@@ -260,7 +260,7 @@ class HeadlessAgentWindow(QWidget):
     
     def on_command_processed(self, command: str, result: dict):
         """Handle command processed signal."""
-        print(f"🎤 Command processed: '{command}' -> {result}")
+        print(f"Command processed: '{command}' -> {result}")
         self.indicator.set_last_command(command)
         
         # Set processing state briefly
@@ -272,7 +272,7 @@ class HeadlessAgentWindow(QWidget):
     
     def on_voice_response(self, response: str):
         """Handle voice response signal."""
-        print(f"🔊 Voice response: '{response}'")
+        print(f"Aras: {response}")
         self.indicator.set_last_response(response)
     
     def set_voice_processing_false(self):
@@ -293,9 +293,9 @@ class HeadlessAgentWindow(QWidget):
         try:
             # In headless mode, just print status information
             self._print_home_status()
-            print("✅ Home status displayed in console")
+            print("Home status displayed in console")
         except Exception as e:
-            print(f"❌ Error getting home status: {e}")
+            print(f"Error: Error getting home status: {e}")
             import traceback
             traceback.print_exc()
         finally:
