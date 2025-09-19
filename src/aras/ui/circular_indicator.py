@@ -16,7 +16,7 @@ class CircularIndicator(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(60, 60)
+        self.setFixedSize(120, 120)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
@@ -50,7 +50,7 @@ class CircularIndicator(QWidget):
         self._pulse_animation.setLoopCount(-1)  # Infinite loop
         self._pulse_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self._pulse_animation.setStartValue(0)
-        self._pulse_animation.setEndValue(30)
+        self._pulse_animation.setEndValue(60)
     
     @pyqtProperty(int)
     def pulse_radius(self):
@@ -175,26 +175,24 @@ class CircularIndicator(QWidget):
             painter.drawEllipse(center.x() - radius, center.y() - radius, radius * 2, radius * 2)
             
             # Draw "A" for Agent
-            painter.setPen(QPen(QColor(255, 255, 255), 2))
-            font = QFont("Arial", 12, QFont.Weight.Bold)
+            painter.setPen(QPen(QColor(255, 255, 255), 3))
+            font = QFont("Arial", 24, QFont.Weight.Bold)
             painter.setFont(font)
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "A")
     
     def mousePressEvent(self, event):
         """Handle mouse press events."""
-        if event.button() == Qt.MouseButton.LeftButton:
-            # Emit signal or call callback for interaction
-            self.parent().show_home_status() if self.parent() else None
+        # Click handling removed - no action on click
         super().mousePressEvent(event)
     
     def enterEvent(self, event):
         """Handle mouse enter events."""
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # No cursor change needed since clicking is disabled
         super().enterEvent(event)
     
     def leaveEvent(self, event):
         """Handle mouse leave events."""
-        self.setCursor(Qt.CursorShape.ArrowCursor)
+        # No cursor change needed since clicking is disabled
         super().leaveEvent(event)
 
 
@@ -204,7 +202,7 @@ class HeadlessAgentWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Aras Agent")
-        self.setFixedSize(60, 60)
+        self.setFixedSize(120, 120)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
@@ -224,7 +222,6 @@ class HeadlessAgentWindow(QWidget):
         self.voice_processor = VoiceCommandProcessor()
         
         # Connect voice signals
-        self.voice_processor.handler.home_status_requested.connect(self.show_home_status)
         self.voice_processor.handler.command_processed.connect(self.on_command_processed)
         self.voice_processor.handler.voice_response.connect(self.on_voice_response)
         
@@ -238,9 +235,11 @@ class HeadlessAgentWindow(QWidget):
         self._processing_voice_command = False
     
     def position_window(self):
-        """Position the window in the bottom-right corner."""
+        """Position the window in the center of the screen."""
         screen = QApplication.primaryScreen().geometry()
-        self.move(screen.width() - self.width() - 20, screen.height() - self.height() - 20)
+        x = (screen.width() - self.width()) // 2
+        y = (screen.height() - self.height()) // 2
+        self.move(x, y)
     
     def update_status(self):
         """Update the agent status."""
@@ -280,42 +279,6 @@ class HeadlessAgentWindow(QWidget):
         self.voice_processing = False
         self.indicator.set_voice_processing(False)
     
-    def show_home_status(self):
-        """Show the home status (simplified for headless mode)."""
-        # Prevent duplicate processing
-        if self._processing_voice_command:
-            print("⏭️ Voice command already being processed, skipping...")
-            return
-        
-        self._processing_voice_command = True
-        print("🏠 Home status requested - running in headless mode")
-        
-        try:
-            # In headless mode, just print status information
-            self._print_home_status()
-            print("Home status displayed in console")
-        except Exception as e:
-            print(f"Error: Error getting home status: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            # Reset the processing flag
-            self._processing_voice_command = False
-    
-    def _print_home_status(self):
-        """Print home status to console (headless mode)."""
-        print("\n" + "="*50)
-        print("🏠 HOME STATUS")
-        print("="*50)
-        
-        # This would normally connect to Home Assistant or other smart home systems
-        # For now, show a simple status message
-        print("📊 Smart Home Status:")
-        print("   • Agent: Active")
-        print("   • Voice: Listening")
-        print("   • Mode: Headless")
-        print("   • Note: Full home automation features require Home Assistant setup")
-        print("="*50)
     
     def process_text_command(self, text: str) -> bool:
         """Process a text command and return True if handled."""
