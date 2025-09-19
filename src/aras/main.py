@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .config import settings
 from .server import app
-from .ui.app import run_ui
+from .ui.app import run_ui, run_headless, run_full_ui
 
 
 def main():
@@ -17,9 +17,9 @@ def main():
     parser = argparse.ArgumentParser(description=f"{settings.agent_name} Agent")
     parser.add_argument(
         "--mode", 
-        choices=["server", "ui", "both"], 
-        default="both",
-        help="Run mode: server only, UI only, or both"
+        choices=["server", "ui", "headless", "both"], 
+        default="headless",
+        help="Run mode: server only, full UI, headless UI, or both"
     )
     parser.add_argument(
         "--host", 
@@ -44,7 +44,9 @@ def main():
     if args.mode == "server":
         run_server(args.host, args.http_port, args.websocket_port)
     elif args.mode == "ui":
-        run_ui()
+        run_full_ui()
+    elif args.mode == "headless":
+        run_headless()
     elif args.mode == "both":
         # Run server in background thread
         import threading
@@ -55,8 +57,8 @@ def main():
         )
         server_thread.start()
         
-        # Run UI in main thread
-        run_ui()
+        # Run headless UI in main thread
+        run_headless()
 
 
 def run_server(host: str, http_port: int, websocket_port: int):

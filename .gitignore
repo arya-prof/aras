@@ -66,6 +66,9 @@ tmp/
 *.tmp
 *.temp
 
+# Documentation files
+*.md
+
 # Audio/Video files
 *.wav
 *.mp3
