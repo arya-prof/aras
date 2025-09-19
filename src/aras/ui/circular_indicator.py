@@ -3,7 +3,7 @@ Circular indicator widget for headless agent status display.
 """
 
 import sys
-from PyQt6.QtWidgets import QWidget, QApplication
+from PyQt6.QtWidgets import QWidget, QApplication, QLabel, QVBoxLayout
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QRadialGradient, QFont
 from PyQt6.QtCore import QRect
@@ -24,6 +24,7 @@ class CircularIndicator(QWidget):
         self._is_active = False
         self._voice_listening = False
         self._voice_processing = False
+        self._voice_responding = False
         self._pulse_animation = None
         self._pulse_radius = 0
         self._opacity = 1.0
@@ -36,6 +37,7 @@ class CircularIndicator(QWidget):
         self.inactive_color = QColor(100, 100, 100)  # Gray when inactive
         self.voice_color = QColor(0, 150, 255)  # Blue when listening
         self.processing_color = QColor(255, 165, 0)  # Orange when processing
+        self.responding_color = QColor(138, 43, 226)  # Purple when speaking
         self.glow_color = QColor(0, 255, 100, 50)  # Glow effect
         
         # Setup pulse animation
@@ -83,6 +85,11 @@ class CircularIndicator(QWidget):
         self._voice_processing = processing
         self.update()
     
+    def set_voice_responding(self, responding: bool):
+        """Set voice responding status."""
+        self._voice_responding = responding
+        self.update()
+    
     def set_last_command(self, command: str):
         """Set the last voice command."""
         self._last_command = command
@@ -111,7 +118,11 @@ class CircularIndicator(QWidget):
         painter.setOpacity(self._opacity)
         
         # Choose color based on status
-        if self._voice_processing:
+        if self._voice_responding:
+            # Purple when speaking
+            main_color = self.responding_color
+            glow_color = QColor(138, 43, 226, 80)
+        elif self._voice_processing:
             # Orange when processing voice
             main_color = self.processing_color
             glow_color = QColor(255, 165, 0, 80)
@@ -128,7 +139,7 @@ class CircularIndicator(QWidget):
             main_color = self.inactive_color
             glow_color = QColor(100, 100, 100, 0)
         
-        if self._is_active or self._voice_listening:
+        if self._is_active or self._voice_listening or self._voice_responding:
             # Draw glow effect
             if self._pulse_radius > 0:
                 glow_rect = QRect(
@@ -221,13 +232,34 @@ class HeadlessAgentWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Aras Agent")
-        self.setFixedSize(120, 120)
+        self.setFixedSize(120, 150)  # Increased height to accommodate status text
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
+        # Create layout
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        
         # Create circular indicator
         self.indicator = CircularIndicator(self)
-        self.indicator.move(0, 0)
+        layout.addWidget(self.indicator, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        # Create status label
+        self.status_label = QLabel("Idle")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                background-color: transparent;
+                font-size: 10px;
+                font-weight: bold;
+            }
+        """)
+        self.status_label.setFixedHeight(20)
+        layout.addWidget(self.status_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        self.setLayout(layout)
         
         # Position window in bottom-right corner
         self.position_window()
@@ -243,6 +275,8 @@ class HeadlessAgentWindow(QWidget):
         # Connect voice signals
         self.voice_processor.handler.command_processed.connect(self.on_command_processed)
         self.voice_processor.handler.voice_response.connect(self.on_voice_response)
+        self.voice_processor.handler.speaking_started.connect(self.on_speaking_started)
+        self.voice_processor.handler.speaking_stopped.connect(self.on_speaking_stopped)
         
         # Start background listening for wake words
         self.voice_processor.start_background_listening()
@@ -251,6 +285,7 @@ class HeadlessAgentWindow(QWidget):
         self.agent_active = False
         self.voice_listening = False
         self.voice_processing = False
+        self.voice_responding = False
         self._processing_voice_command = False
         
         # Dragging properties for the main window
@@ -279,6 +314,66 @@ class HeadlessAgentWindow(QWidget):
         self.indicator.set_active(self.agent_active)
         self.indicator.set_voice_listening(self.voice_listening)
         self.indicator.set_voice_processing(self.voice_processing)
+        
+        # Update status text
+        self.update_status_text()
+    
+    def update_status_text(self):
+        """Update the status text based on current state."""
+        # Priority order: Speaking > Thinking > Listening > Ready > Idle
+        if self.voice_responding:
+            # When speaking, ignore other states to prevent mixing
+            self.status_label.setText("Speaking")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    color: #8A2BE2;
+                    background-color: transparent;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+            """)
+        elif self.voice_processing:
+            # When processing, ignore listening state
+            self.status_label.setText("Thinking")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    color: #FFA500;
+                    background-color: transparent;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+            """)
+        elif self.voice_listening and not self.voice_responding:
+            # Only show listening if not speaking
+            self.status_label.setText("Listening")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    color: #0096FF;
+                    background-color: transparent;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+            """)
+        elif self.agent_active:
+            self.status_label.setText("Ready")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    color: #00FF64;
+                    background-color: transparent;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            self.status_label.setText("Idle")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    color: #808080;
+                    background-color: transparent;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+            """)
     
     def on_command_processed(self, command: str, result: dict):
         """Handle command processed signal."""
@@ -288,6 +383,7 @@ class HeadlessAgentWindow(QWidget):
         # Set processing state briefly
         self.voice_processing = True
         self.indicator.set_voice_processing(True)
+        self.update_status_text()
         
         # Reset processing state after a short delay
         QTimer.singleShot(2000, lambda: self.set_voice_processing_false())
@@ -296,12 +392,31 @@ class HeadlessAgentWindow(QWidget):
         """Handle voice response signal."""
         print(f"Aras: {response}")
         self.indicator.set_last_response(response)
+        # Note: Speaking state is now handled by speaking_started/speaking_stopped signals
+    
+    def on_speaking_started(self):
+        """Handle speaking started signal."""
+        self.voice_responding = True
+        self.indicator.set_voice_responding(True)
+        # Temporarily disable voice listening while speaking
+        if hasattr(self.voice_processor, 'pause_listening'):
+            self.voice_processor.pause_listening()
+        self.update_status_text()
+    
+    def on_speaking_stopped(self):
+        """Handle speaking stopped signal."""
+        self.voice_responding = False
+        self.indicator.set_voice_responding(False)
+        # Re-enable voice listening after speaking
+        if hasattr(self.voice_processor, 'resume_listening'):
+            self.voice_processor.resume_listening()
+        self.update_status_text()
     
     def set_voice_processing_false(self):
         """Set voice processing to false."""
         self.voice_processing = False
         self.indicator.set_voice_processing(False)
-    
+        self.update_status_text()
     
     def process_text_command(self, text: str) -> bool:
         """Process a text command and return True if handled."""
@@ -311,6 +426,7 @@ class HeadlessAgentWindow(QWidget):
         """Set the agent status externally."""
         self.agent_active = active
         self.indicator.set_active(active)
+        self.update_status_text()
     
     def mousePressEvent(self, event):
         """Handle mouse press events for dragging."""

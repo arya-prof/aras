@@ -27,6 +27,8 @@ class VoiceCommandHandler(QObject):
     home_status_requested = pyqtSignal()
     command_processed = pyqtSignal(str, dict)  # command, result
     voice_response = pyqtSignal(str)  # TTS response
+    speaking_started = pyqtSignal()  # When TTS starts speaking
+    speaking_stopped = pyqtSignal()  # When TTS stops speaking
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -246,6 +248,9 @@ Current context: The user is interacting with the Aras AI agent via voice comman
             import subprocess
             import os
             
+            # Emit speaking started signal
+            self.speaking_started.emit()
+            
             def speak_with_persistent_audio():
                 success = False
                 
@@ -334,6 +339,9 @@ $synth.Dispose()''')
             
             # Wait for thread to complete
             tts_thread.join(timeout=20)
+            
+            # Emit speaking stopped signal
+            self.speaking_stopped.emit()
             
             # Small delay to prevent audio conflicts
             time.sleep(0.5)
