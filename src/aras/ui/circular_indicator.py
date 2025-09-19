@@ -23,14 +23,18 @@ class CircularIndicator(QWidget):
         # Status properties
         self._is_active = False
         self._voice_listening = False
+        self._voice_processing = False
         self._pulse_animation = None
         self._pulse_radius = 0
         self._opacity = 1.0
+        self._last_command = ""
+        self._last_response = ""
         
         # Colors
         self.active_color = QColor(0, 255, 100)  # Green when active
         self.inactive_color = QColor(100, 100, 100)  # Gray when inactive
         self.voice_color = QColor(0, 150, 255)  # Blue when listening
+        self.processing_color = QColor(255, 165, 0)  # Orange when processing
         self.glow_color = QColor(0, 255, 100, 50)  # Glow effect
         
         # Setup pulse animation
@@ -73,6 +77,21 @@ class CircularIndicator(QWidget):
         self._voice_listening = listening
         self.update()
     
+    def set_voice_processing(self, processing: bool):
+        """Set voice processing status."""
+        self._voice_processing = processing
+        self.update()
+    
+    def set_last_command(self, command: str):
+        """Set the last voice command."""
+        self._last_command = command
+        self.update()
+    
+    def set_last_response(self, response: str):
+        """Set the last voice response."""
+        self._last_response = response
+        self.update()
+    
     def is_active(self) -> bool:
         """Get the active state."""
         return self._is_active
@@ -91,8 +110,12 @@ class CircularIndicator(QWidget):
         painter.setOpacity(self._opacity)
         
         # Choose color based on status
-        if self._voice_listening:
-            # Blue when listening for voice
+        if self._voice_processing:
+            # Orange when processing voice
+            main_color = self.processing_color
+            glow_color = QColor(255, 165, 0, 80)
+        elif self._voice_listening:
+            # Blue when listening
             main_color = self.voice_color
             glow_color = QColor(0, 150, 255, 80)
         elif self._is_active:
@@ -199,13 +222,19 @@ class HeadlessAgentWindow(QWidget):
         
         # Setup voice command processor
         self.voice_processor = VoiceCommandProcessor()
-        # Only use the signal connection, not both signal and callback
+        
+        # Connect voice signals
         self.voice_processor.handler.home_status_requested.connect(self.show_home_status)
-        self.voice_processor.start_listening()
+        self.voice_processor.handler.command_processed.connect(self.on_command_processed)
+        self.voice_processor.handler.voice_response.connect(self.on_voice_response)
+        
+        # Start background listening for wake words
+        self.voice_processor.start_background_listening()
         
         # Agent status
         self.agent_active = False
         self.voice_listening = False
+        self.voice_processing = False
         self._processing_voice_command = False
     
     def position_window(self):
@@ -227,6 +256,29 @@ class HeadlessAgentWindow(QWidget):
         # Update indicator with both agent and voice status
         self.indicator.set_active(self.agent_active)
         self.indicator.set_voice_listening(self.voice_listening)
+        self.indicator.set_voice_processing(self.voice_processing)
+    
+    def on_command_processed(self, command: str, result: dict):
+        """Handle command processed signal."""
+        print(f"🎤 Command processed: '{command}' -> {result}")
+        self.indicator.set_last_command(command)
+        
+        # Set processing state briefly
+        self.voice_processing = True
+        self.indicator.set_voice_processing(True)
+        
+        # Reset processing state after a short delay
+        QTimer.singleShot(2000, lambda: self.set_voice_processing_false())
+    
+    def on_voice_response(self, response: str):
+        """Handle voice response signal."""
+        print(f"🔊 Voice response: '{response}'")
+        self.indicator.set_last_response(response)
+    
+    def set_voice_processing_false(self):
+        """Set voice processing to false."""
+        self.voice_processing = False
+        self.indicator.set_voice_processing(False)
     
     def show_home_status(self):
         """Show the home status (simplified for headless mode)."""
