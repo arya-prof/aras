@@ -251,10 +251,32 @@ Current context: The user is interacting with the Aras AI agent via voice comman
                 
                 # Method 1: Use Windows PowerShell TTS (most reliable)
                 try:
-                    # Escape quotes in text for PowerShell
-                    escaped_text = text.replace("'", "''").replace('"', '""')
-                    cmd = f'powershell -Command "Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Rate = 0; $synth.Volume = 100; $synth.Speak(\'{escaped_text}\'); $synth.Dispose()"'
+                    # Use a more robust approach with here-string to avoid quote escaping issues
+                    import tempfile
+                    import os
+                    
+                    # Create a temporary PowerShell script file
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False) as f:
+                        f.write(f'''Add-Type -AssemblyName System.Speech
+$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$synth.Rate = 0
+$synth.Volume = 100
+$synth.Speak(@"
+{text}
+"@)
+$synth.Dispose()''')
+                        script_path = f.name
+                    
+                    # Execute the PowerShell script
+                    cmd = f'powershell -ExecutionPolicy Bypass -File "{script_path}"'
                     subprocess.run(cmd, shell=True, check=True, timeout=15)
+                    
+                    # Clean up the temporary file
+                    try:
+                        os.unlink(script_path)
+                    except:
+                        pass
+                    
                     print(f"🔊 Spoke (Windows TTS): {text}")
                     success = True
                     
