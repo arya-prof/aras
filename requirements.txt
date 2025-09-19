@@ -1,0 +1,51 @@
+# Core Dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+pydantic>=2.5.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.6
+
+# LangChain and AI
+langchain>=0.1.0
+langchain-openai>=0.0.2
+langchain-community>=0.0.10
+openai>=1.3.0
+ollama>=0.1.7
+
+# Vector Database
+chromadb>=0.4.18
+sentence-transformers>=2.2.2
+
+# Home Assistant (using latest compatible version)
+homeassistant>=2024.12.0
+aiohttp>=3.9.0
+
+# System Tools
+psutil>=5.9.0
+paramiko>=3.3.0
+pywinrm>=0.4.0
+
+# Web Tools
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+playwright>=1.40.0
+
+# Communication
+twilio>=8.10.0
+
+# Vision and Audio
+opencv-python>=4.8.0
+Pillow>=10.1.0
+speechrecognition>=3.10.0
+pyttsx3>=2.90
+
+# Qt UI
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
+# Utilities
+python-dotenv>=1.0.0
+loguru>=0.7.0
+asyncio-mqtt>=0.16.0
