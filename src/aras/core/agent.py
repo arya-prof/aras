@@ -35,6 +35,7 @@ class ArasAgent:
         )
         self.agent_executor = self._create_agent_executor()
         self.state = AgentState()
+        self._initialized = False
         
     def _initialize_llm(self):
         """Initialize the language model."""
@@ -50,6 +51,27 @@ class ArasAgent:
                 temperature=0.7
             )
     
+    async def initialize(self) -> bool:
+        """Initialize the agent and all tools."""
+        if self._initialized:
+            return True
+        
+        try:
+            # Initialize all tools
+            tool_results = await self.tool_registry.initialize_all_tools()
+            
+            # Log tool initialization results
+            for tool_name, success in tool_results.items():
+                if not success:
+                    print(f"Warning: Tool {tool_name} failed to initialize")
+            
+            self._initialized = True
+            print(f"Agent initialized with {len(self.tool_registry.get_all_tools())} tools")
+            return True
+        except Exception as e:
+            print(f"Error initializing agent: {e}")
+            return False
+    
     def _create_agent_executor(self) -> None:
         """Create a simple agent executor (placeholder for now)."""
         # For now, we'll handle responses directly in process_message
@@ -64,6 +86,10 @@ class ArasAgent:
     async def process_message(self, message: UserInput) -> str:
         """Process a user message and return response."""
         try:
+            # Ensure agent is initialized
+            if not self._initialized:
+                await self.initialize()
+            
             self.state.is_active = True
             self.state.current_session = message.session_id
             self.state.last_activity = datetime.now()
@@ -159,11 +185,34 @@ Assistant:"""
             "last_activity": self.state.last_activity,
             "active_tools": self.state.active_tools,
             "tool_count": len(self.tool_registry.get_all_tools()),
-            "memory_size": len(self.memory.chat_memory.messages)
+            "healthy_tools": len(self.tool_registry.get_healthy_tools()),
+            "unhealthy_tools": len(self.tool_registry.get_unhealthy_tools()),
+            "memory_size": len(self.memory.chat_memory.messages),
+            "initialized": self._initialized
         }
     
+    def get_tool_health_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get health status of all tools."""
+        return self.tool_registry.get_tool_health_status()
+    
+    async def restart_unhealthy_tools(self) -> Dict[str, bool]:
+        """Restart all unhealthy tools."""
+        return await self.tool_registry.restart_unhealthy_tools()
+    
+    async def restart_tool(self, tool_name: str) -> bool:
+        """Restart a specific tool."""
+        return await self.tool_registry.restart_tool(tool_name)
+    
     async def shutdown(self):
-        """Shutdown the agent."""
+        """Shutdown the agent and cleanup all resources."""
         self.state.is_active = False
         self.state.current_session = None
+        
+        # Cleanup all tools
+        await self.tool_registry.cleanup_all_tools()
+        
+        # Cleanup state manager
         self.state_manager.cleanup()
+        
+        self._initialized = False
+        print("Agent shutdown complete")

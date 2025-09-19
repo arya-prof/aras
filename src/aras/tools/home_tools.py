@@ -4,11 +4,15 @@ Smart home tools for device control, scene management, and climate control.
 
 import aiohttp
 import asyncio
+import ssl
+import logging
 from typing import Any, Dict, List, Optional
 
 from .base import AsyncTool
 from ..models import ToolCategory
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 # Try to import homeassistant, but make it optional
 try:
@@ -19,7 +23,7 @@ except ImportError:
 
 
 class DeviceControlTool(AsyncTool):
-    """Tool for controlling smart home devices."""
+    """Tool for controlling smart home devices with proper client management."""
     
     def __init__(self):
         super().__init__(
@@ -29,9 +33,59 @@ class DeviceControlTool(AsyncTool):
         )
         self.ha_base_url = settings.ha_base_url
         self.ha_token = settings.ha_token
+        self.session = None
+        self.connector = None
+    
+    async def _setup_resources(self):
+        """Setup Home Assistant client with connection pooling."""
+        if not self.ha_base_url or not self.ha_token:
+            logger.warning("Home Assistant not configured, tool will be disabled")
+            self.disable()
+            return
+        
+        # Create SSL context
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        # Create connector with connection pooling
+        self.connector = aiohttp.TCPConnector(
+            limit=50,  # Total connection pool size
+            limit_per_host=10,  # Per-host connection limit
+            ssl=ssl_context,
+            keepalive_timeout=30,
+            enable_cleanup_closed=True
+        )
+        
+        # Create session with timeout and headers
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        self.session = aiohttp.ClientSession(
+            connector=self.connector,
+            timeout=timeout,
+            headers={
+                'Authorization': f'Bearer {self.ha_token}',
+                'Content-Type': 'application/json',
+                'User-Agent': 'ARAS-HomeTool/1.0'
+            }
+        )
+        
+        self.add_resource(self.session)
+        self.add_resource(self.connector)
+        logger.info(f"DeviceControlTool initialized with Home Assistant client")
+    
+    async def _cleanup_resources(self):
+        """Cleanup Home Assistant client resources."""
+        if self.session:
+            await self.session.close()
+        if self.connector:
+            await self.connector.close()
+        logger.info(f"DeviceControlTool resources cleaned up")
     
     async def _execute_async(self, parameters: Dict[str, Any]) -> Any:
         """Execute device control operation."""
+        if not self.ha_base_url or not self.ha_token:
+            raise RuntimeError("Home Assistant not configured")
+        
         operation = parameters.get("operation")
         entity_id = parameters.get("entity_id")
         
@@ -60,118 +114,94 @@ class DeviceControlTool(AsyncTool):
         """Turn on a device."""
         if not HA_AVAILABLE:
             raise RuntimeError("Home Assistant package not installed. Install with: pip install homeassistant")
-        if not self.ha_base_url or not self.ha_token:
-            raise RuntimeError("Home Assistant not configured")
         
         url = f"{self.ha_base_url}/api/services/homeassistant/turn_on"
-        headers = {
-            "Authorization": f"Bearer {self.ha_token}",
-            "Content-Type": "application/json"
-        }
         data = {
             "entity_id": entity_id,
             **attributes
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=data) as response:
+        try:
+            async with self.session.post(url, json=data) as response:
                 if response.status == 200:
                     return {"success": True, "entity_id": entity_id, "action": "turned_on"}
                 else:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to turn on device: {error_text}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Network error turning on device: {e}")
     
     async def _turn_off_device(self, entity_id: str) -> Dict[str, Any]:
         """Turn off a device."""
         if not HA_AVAILABLE:
             raise RuntimeError("Home Assistant package not installed. Install with: pip install homeassistant")
-        if not self.ha_base_url or not self.ha_token:
-            raise RuntimeError("Home Assistant not configured")
         
         url = f"{self.ha_base_url}/api/services/homeassistant/turn_off"
-        headers = {
-            "Authorization": f"Bearer {self.ha_token}",
-            "Content-Type": "application/json"
-        }
         data = {"entity_id": entity_id}
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=data) as response:
+        try:
+            async with self.session.post(url, json=data) as response:
                 if response.status == 200:
                     return {"success": True, "entity_id": entity_id, "action": "turned_off"}
                 else:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to turn off device: {error_text}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Network error turning off device: {e}")
     
     async def _toggle_device(self, entity_id: str) -> Dict[str, Any]:
         """Toggle a device."""
-        if not self.ha_base_url or not self.ha_token:
-            raise RuntimeError("Home Assistant not configured")
-        
         url = f"{self.ha_base_url}/api/services/homeassistant/toggle"
-        headers = {
-            "Authorization": f"Bearer {self.ha_token}",
-            "Content-Type": "application/json"
-        }
         data = {"entity_id": entity_id}
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=data) as response:
+        try:
+            async with self.session.post(url, json=data) as response:
                 if response.status == 200:
                     return {"success": True, "entity_id": entity_id, "action": "toggled"}
                 else:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to toggle device: {error_text}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Network error toggling device: {e}")
     
     async def _set_device_state(self, entity_id: str, state: str, attributes: Dict[str, Any]) -> Dict[str, Any]:
         """Set device state."""
-        if not self.ha_base_url or not self.ha_token:
-            raise RuntimeError("Home Assistant not configured")
-        
         url = f"{self.ha_base_url}/api/states/{entity_id}"
-        headers = {
-            "Authorization": f"Bearer {self.ha_token}",
-            "Content-Type": "application/json"
-        }
         data = {
             "state": state,
             "attributes": attributes
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=data) as response:
+        try:
+            async with self.session.post(url, json=data) as response:
                 if response.status == 200:
                     return {"success": True, "entity_id": entity_id, "state": state}
                 else:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to set device state: {error_text}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Network error setting device state: {e}")
     
     async def _get_device_state(self, entity_id: str) -> Dict[str, Any]:
         """Get device state."""
-        if not self.ha_base_url or not self.ha_token:
-            raise RuntimeError("Home Assistant not configured")
-        
         url = f"{self.ha_base_url}/api/states/{entity_id}"
-        headers = {"Authorization": f"Bearer {self.ha_token}"}
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as response:
+        try:
+            async with self.session.get(url) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to get device state: {error_text}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Network error getting device state: {e}")
     
     async def _list_devices(self, domain: Optional[str] = None) -> List[Dict[str, Any]]:
         """List devices."""
-        if not self.ha_base_url or not self.ha_token:
-            raise RuntimeError("Home Assistant not configured")
-        
         url = f"{self.ha_base_url}/api/states"
-        headers = {"Authorization": f"Bearer {self.ha_token}"}
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as response:
+        try:
+            async with self.session.get(url) as response:
                 if response.status == 200:
                     states = await response.json()
                     if domain:
@@ -180,6 +210,8 @@ class DeviceControlTool(AsyncTool):
                 else:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to list devices: {error_text}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Network error listing devices: {e}")
     
     def get_parameters_schema(self) -> Dict[str, Any]:
         """Get parameters schema."""

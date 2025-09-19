@@ -90,7 +90,7 @@ class VoiceCommandHandler(QObject):
     def trigger_home_status(self):
         """Trigger the home status visualization."""
         print("🎯 Triggering home status visualization...")
-        # Only emit the signal, don't call callback to avoid duplicates
+        # Emit the signal to trigger home status
         self.home_status_requested.emit()
         print("📡 Signal emitted for home status")
 
@@ -198,7 +198,6 @@ class VoiceCommandProcessor:
                         text = self.recognizer.recognize_google(audio, language="en-US", show_all=True)
                         if text and 'alternative' in text:
                             alternatives = [alt['transcript'].lower() for alt in text['alternative']]
-                            print(f"Unclear speech, alternatives: {alternatives}")
                             
                             # Try to match alternatives
                             for alt_text in alternatives:
@@ -207,7 +206,9 @@ class VoiceCommandProcessor:
                                     self.handler.home_status_requested.emit()
                                     break
                     except:
-                        print("❌ Speech was unintelligible")
+                        # Only show this message occasionally to reduce spam
+                        if time.time() % 10 < 1:  # Show every 10 seconds max
+                            print("❌ Speech was unintelligible")
                         
                 except sr.RequestError as e:
                     print(f"❌ Could not request results from speech recognition service: {e}")

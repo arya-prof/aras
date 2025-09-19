@@ -4,16 +4,20 @@ Web tools for search, browser automation, and API interactions.
 
 import aiohttp
 import asyncio
+import ssl
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 import json
+import logging
 
 from .base import AsyncTool
 from ..models import ToolCategory
 
+logger = logging.getLogger(__name__)
+
 
 class WebSearchTool(AsyncTool):
-    """Tool for web search operations."""
+    """Tool for web search operations with connection pooling."""
     
     def __init__(self):
         super().__init__(
@@ -21,6 +25,48 @@ class WebSearchTool(AsyncTool):
             category=ToolCategory.WEB,
             description="Search the web using various search engines"
         )
+        self.session = None
+        self.connector = None
+    
+    async def _setup_resources(self):
+        """Setup HTTP session with connection pooling."""
+        # Create SSL context
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        # Create connector with connection pooling
+        self.connector = aiohttp.TCPConnector(
+            limit=100,  # Total connection pool size
+            limit_per_host=30,  # Per-host connection limit
+            ssl=ssl_context,
+            keepalive_timeout=30,
+            enable_cleanup_closed=True
+        )
+        
+        # Create session with timeout and headers
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        self.session = aiohttp.ClientSession(
+            connector=self.connector,
+            timeout=timeout,
+            headers={
+                'User-Agent': 'ARAS-WebTool/1.0',
+                'Accept': 'application/json, text/html, */*',
+                'Accept-Language': 'en-US,en;q=0.9'
+            }
+        )
+        
+        self.add_resource(self.session)
+        self.add_resource(self.connector)
+        logger.info(f"WebSearchTool initialized with connection pooling")
+    
+    async def _cleanup_resources(self):
+        """Cleanup HTTP resources."""
+        if self.session:
+            await self.session.close()
+        if self.connector:
+            await self.connector.close()
+        logger.info(f"WebSearchTool resources cleaned up")
     
     async def _execute_async(self, parameters: Dict[str, Any]) -> Any:
         """Execute web search."""
@@ -44,8 +90,8 @@ class WebSearchTool(AsyncTool):
         # In a real implementation, you'd use a proper DuckDuckGo API or scraper
         url = f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1&skip_disambig=1"
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+        try:
+            async with self.session.get(url) as response:
                 if response.status == 200:
                     data = await response.json()
                     results = []
@@ -63,6 +109,8 @@ class WebSearchTool(AsyncTool):
                     return results
                 else:
                     raise RuntimeError(f"Search failed with status {response.status}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Network error during search: {e}")
     
     async def _search_google(self, query: str, max_results: int) -> List[Dict[str, Any]]:
         """Search using Google (placeholder implementation)."""
@@ -202,7 +250,7 @@ class BrowserAutomationTool(AsyncTool):
 
 
 class APITool(AsyncTool):
-    """Tool for API interactions."""
+    """Tool for API interactions with connection pooling."""
     
     def __init__(self):
         super().__init__(
@@ -210,6 +258,48 @@ class APITool(AsyncTool):
             category=ToolCategory.WEB,
             description="Make HTTP requests to APIs and web services"
         )
+        self.session = None
+        self.connector = None
+    
+    async def _setup_resources(self):
+        """Setup HTTP session with connection pooling."""
+        # Create SSL context
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        # Create connector with connection pooling
+        self.connector = aiohttp.TCPConnector(
+            limit=200,  # Total connection pool size
+            limit_per_host=50,  # Per-host connection limit
+            ssl=ssl_context,
+            keepalive_timeout=60,
+            enable_cleanup_closed=True
+        )
+        
+        # Create session with timeout and headers
+        timeout = aiohttp.ClientTimeout(total=60, connect=15)
+        self.session = aiohttp.ClientSession(
+            connector=self.connector,
+            timeout=timeout,
+            headers={
+                'User-Agent': 'ARAS-APITool/1.0',
+                'Accept': 'application/json, application/xml, text/plain, */*',
+                'Accept-Encoding': 'gzip, deflate'
+            }
+        )
+        
+        self.add_resource(self.session)
+        self.add_resource(self.connector)
+        logger.info(f"APITool initialized with connection pooling")
+    
+    async def _cleanup_resources(self):
+        """Cleanup HTTP resources."""
+        if self.session:
+            await self.session.close()
+        if self.connector:
+            await self.connector.close()
+        logger.info(f"APITool resources cleaned up")
     
     async def _execute_async(self, parameters: Dict[str, Any]) -> Any:
         """Execute API request."""
@@ -226,25 +316,24 @@ class APITool(AsyncTool):
     
     async def _make_request(self, url: str, method: str, headers: Dict[str, str], 
                           data: Any, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Make HTTP request."""
-        async with aiohttp.ClientSession() as session:
-            try:
-                if method == "GET":
-                    async with session.get(url, headers=headers, params=params) as response:
-                        return await self._process_response(response)
-                elif method == "POST":
-                    async with session.post(url, headers=headers, json=data, params=params) as response:
-                        return await self._process_response(response)
-                elif method == "PUT":
-                    async with session.put(url, headers=headers, json=data, params=params) as response:
-                        return await self._process_response(response)
-                elif method == "DELETE":
-                    async with session.delete(url, headers=headers, params=params) as response:
-                        return await self._process_response(response)
-                else:
-                    raise ValueError(f"Unsupported HTTP method: {method}")
-            except aiohttp.ClientError as e:
-                raise RuntimeError(f"Request failed: {e}")
+        """Make HTTP request using pooled session."""
+        try:
+            if method == "GET":
+                async with self.session.get(url, headers=headers, params=params) as response:
+                    return await self._process_response(response)
+            elif method == "POST":
+                async with self.session.post(url, headers=headers, json=data, params=params) as response:
+                    return await self._process_response(response)
+            elif method == "PUT":
+                async with self.session.put(url, headers=headers, json=data, params=params) as response:
+                    return await self._process_response(response)
+            elif method == "DELETE":
+                async with self.session.delete(url, headers=headers, params=params) as response:
+                    return await self._process_response(response)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+        except aiohttp.ClientError as e:
+            raise RuntimeError(f"Request failed: {e}")
     
     async def _process_response(self, response: aiohttp.ClientResponse) -> Dict[str, Any]:
         """Process HTTP response."""

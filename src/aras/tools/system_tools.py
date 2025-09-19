@@ -6,15 +6,18 @@ import os
 import psutil
 import subprocess
 import shutil
+import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
 from .base import AsyncTool, SyncTool
 from ..models import ToolCategory
 
+logger = logging.getLogger(__name__)
+
 
 class FileOperationsTool(AsyncTool):
-    """Tool for file operations."""
+    """Tool for file operations with proper resource management."""
     
     def __init__(self):
         super().__init__(
@@ -22,6 +25,7 @@ class FileOperationsTool(AsyncTool):
             category=ToolCategory.SYSTEM,
             description="Perform file operations like read, write, copy, move, delete"
         )
+        self._file_handles = []  # Track open file handles
     
     async def _execute_async(self, parameters: Dict[str, Any]) -> Any:
         """Execute file operation."""
@@ -58,21 +62,30 @@ class FileOperationsTool(AsyncTool):
             raise ValueError(f"Unknown operation: {operation}")
     
     async def _read_file(self, path: Path, encoding: str) -> str:
-        """Read file content."""
+        """Read file content with proper resource management."""
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
         
-        with open(path, 'r', encoding=encoding) as f:
-            return f.read()
+        try:
+            with open(path, 'r', encoding=encoding) as f:
+                content = f.read()
+            return content
+        except Exception as e:
+            logger.error(f"Error reading file {path}: {e}")
+            raise
     
     async def _write_file(self, path: Path, content: str, encoding: str) -> bool:
-        """Write content to file."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(path, 'w', encoding=encoding) as f:
-            f.write(content)
-        
-        return True
+        """Write content to file with proper resource management."""
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(path, 'w', encoding=encoding) as f:
+                f.write(content)
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error writing file {path}: {e}")
+            raise
     
     async def _copy_file(self, src: Path, dest: Path) -> bool:
         """Copy file."""
@@ -127,8 +140,38 @@ class FileOperationsTool(AsyncTool):
     
     async def _create_directory(self, path: Path) -> bool:
         """Create directory."""
-        path.mkdir(parents=True, exist_ok=True)
-        return True
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            return True
+        except Exception as e:
+            logger.error(f"Error creating directory {path}: {e}")
+            raise
+    
+    async def health_check(self):
+        """Health check for file operations tool."""
+        try:
+            # Test basic file operations in temp directory
+            temp_dir = self.get_temp_dir()
+            if not temp_dir:
+                raise Exception("No temp directory available")
+            
+            test_file = temp_dir / "health_check.txt"
+            
+            # Test write
+            await self._write_file(test_file, "health check", "utf-8")
+            
+            # Test read
+            content = await self._read_file(test_file, "utf-8")
+            if content != "health check":
+                raise Exception("File content mismatch")
+            
+            # Test delete
+            test_file.unlink()
+            
+            logger.debug("FileOperationsTool health check passed")
+        except Exception as e:
+            logger.error(f"FileOperationsTool health check failed: {e}")
+            raise
     
     def get_parameters_schema(self) -> Dict[str, Any]:
         """Get parameters schema."""
@@ -261,6 +304,25 @@ class ProcessManagementTool(AsyncTool):
         except psutil.NoSuchProcess:
             raise ValueError(f"Process with PID {pid} not found")
     
+    async def health_check(self):
+        """Health check for process management tool."""
+        try:
+            # Test basic process operations
+            processes = await self._list_processes("")
+            if not isinstance(processes, list):
+                raise Exception("Process list not returned correctly")
+            
+            # Test getting current process info
+            current_pid = os.getpid()
+            process_info = await self._get_process_info(current_pid)
+            if not isinstance(process_info, dict) or process_info.get("pid") != current_pid:
+                raise Exception("Process info not returned correctly")
+            
+            logger.debug("ProcessManagementTool health check passed")
+        except Exception as e:
+            logger.error(f"ProcessManagementTool health check failed: {e}")
+            raise
+    
     def get_parameters_schema(self) -> Dict[str, Any]:
         """Get parameters schema."""
         return {
@@ -388,6 +450,29 @@ class SystemControlTool(AsyncTool):
             "virtual": memory._asdict(),
             "swap": swap._asdict()
         }
+    
+    async def health_check(self):
+        """Health check for system control tool."""
+        try:
+            # Test basic system info operations
+            system_info = await self._get_system_info()
+            if not isinstance(system_info, dict):
+                raise Exception("System info not returned correctly")
+            
+            # Test memory usage
+            memory_info = await self._get_memory_usage()
+            if not isinstance(memory_info, dict) or "virtual" not in memory_info:
+                raise Exception("Memory info not returned correctly")
+            
+            # Test disk usage
+            disk_info = await self._get_disk_usage()
+            if not isinstance(disk_info, list):
+                raise Exception("Disk info not returned correctly")
+            
+            logger.debug("SystemControlTool health check passed")
+        except Exception as e:
+            logger.error(f"SystemControlTool health check failed: {e}")
+            raise
     
     def get_parameters_schema(self) -> Dict[str, Any]:
         """Get parameters schema."""

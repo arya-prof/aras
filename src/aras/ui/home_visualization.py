@@ -358,12 +358,15 @@ class HomeVisualizationWindow(QWidget):
         try:
             # Try to get real data from Home Assistant
             real_data = self.get_real_home_data()
+            
             if real_data:
                 self.data_bridge.set_home_data(real_data)
                 self.update_status_text(real_data)
             else:
                 # Fallback to sample data
                 sample_data = self.generate_sample_home_data()
+                # Add a note that this is sample data
+                sample_data['note'] = 'Sample data - Home Assistant not configured'
                 self.data_bridge.set_home_data(sample_data)
                 self.update_status_text(sample_data)
         except Exception as e:
@@ -378,22 +381,38 @@ class HomeVisualizationWindow(QWidget):
         try:
             # Import home tools
             from ..tools.home_tools import DeviceControlTool
+            from ..config import settings
+            
+            # Check if Home Assistant is configured
+            if not settings.ha_base_url or not settings.ha_token or settings.ha_token == "your_home_assistant_token":
+                # Home Assistant not configured, return None to use sample data
+                return None
             
             # Create device control tool
             device_tool = DeviceControlTool()
             
+            # Initialize the tool first
+            asyncio.run(device_tool.initialize())
+            
             # Get all devices
             devices_data = asyncio.run(device_tool._list_devices())
             
-            if not devices_data:
+            if not devices_data or not isinstance(devices_data, list):
                 return None
             
             # Convert Home Assistant data to our format
             devices = []
             for device in devices_data:
+                # Ensure device is a dictionary and has required fields
+                if not isinstance(device, dict):
+                    continue
+                    
                 entity_id = device.get('entity_id', '')
                 state = device.get('state', 'unknown')
                 attributes = device.get('attributes', {})
+                
+                if not entity_id:
+                    continue
                 
                 # Determine device type and position
                 device_type = self._determine_device_type(entity_id)
@@ -418,8 +437,16 @@ class HomeVisualizationWindow(QWidget):
             
         except Exception as e:
             # Don't print error messages for connection issues - just fall back to sample data
-            if "Cannot connect to host" in str(e) or "refused the network connection" in str(e):
-                # This is expected when Home Assistant is not running
+            if any(msg in str(e).lower() for msg in [
+                "cannot connect to host", 
+                "refused the network connection",
+                "home assistant not configured",
+                "connection refused",
+                "timeout",
+                "network error",
+                "failed to list devices"
+            ]):
+                # This is expected when Home Assistant is not running or configured
                 pass
             else:
                 print(f"Error getting real home data: {e}")

@@ -18,6 +18,7 @@ from .core.agent import ArasAgent
 from .core.message_handler import MessageHandler
 from .models import UserInput, AgentResponse, ToolCall, ToolResult, StateUpdate, UICommand, ErrorMessage, MessageType, Message
 from .tools.registry import create_tool_registry
+from .tools.health_monitor import ToolHealthMonitor
 
 
 class WebSocketManager:
@@ -28,6 +29,7 @@ class WebSocketManager:
         self.agent = ArasAgent()
         self.message_handler = MessageHandler()
         self.tool_registry = create_tool_registry()
+        self.health_monitor = ToolHealthMonitor(self.tool_registry)
         
         # Register message handlers
         self.message_handler.subscribe(MessageType.AGENT_RESPONSE, self._handle_agent_response)
@@ -206,6 +208,54 @@ async def get_tools():
             for category in manager.tool_registry.categories.keys()
         }
     }
+
+
+@app.get("/tools/health")
+async def get_tools_health():
+    """Get health status of all tools."""
+    return manager.agent.get_tool_health_status()
+
+
+@app.get("/tools/health/summary")
+async def get_tools_health_summary():
+    """Get health summary of all tools."""
+    return manager.health_monitor.get_health_summary()
+
+
+@app.get("/tools/health/unhealthy")
+async def get_unhealthy_tools():
+    """Get list of unhealthy tools."""
+    return {
+        "unhealthy_tools": manager.health_monitor.get_unhealthy_tools()
+    }
+
+
+@app.post("/tools/health/check")
+async def force_health_check(tool_name: Optional[str] = None):
+    """Force a health check for specific tool or all tools."""
+    results = await manager.health_monitor.force_health_check(tool_name)
+    return {"results": results}
+
+
+@app.post("/tools/restart")
+async def restart_tool(tool_name: str):
+    """Restart a specific tool."""
+    success = await manager.agent.restart_tool(tool_name)
+    return {"success": success, "tool_name": tool_name}
+
+
+@app.post("/tools/restart/unhealthy")
+async def restart_unhealthy_tools():
+    """Restart all unhealthy tools."""
+    results = await manager.agent.restart_unhealthy_tools()
+    return {"results": results}
+
+
+@app.post("/tools/health/auto-restart")
+async def auto_restart_unhealthy_tools():
+    """Automatically restart unhealthy tools."""
+    results = await manager.health_monitor.auto_restart_unhealthy_tools()
+    return {"results": results}
 
 
 @app.post("/tools/{tool_name}/execute")
@@ -398,6 +448,36 @@ async def get_ui():
     </html>
     """
     return HTMLResponse(content=html_content)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize agent and start health monitoring on startup."""
+    try:
+        # Initialize the agent
+        await manager.agent.initialize()
+        
+        # Start health monitoring
+        await manager.health_monitor.start_monitoring()
+        
+        logger.info("ARAS server started successfully")
+    except Exception as e:
+        logger.error(f"Error during startup: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup resources on shutdown."""
+    try:
+        # Stop health monitoring
+        await manager.health_monitor.stop_monitoring()
+        
+        # Shutdown the agent
+        await manager.agent.shutdown()
+        
+        logger.info("ARAS server shutdown complete")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
 
 
 if __name__ == "__main__":
