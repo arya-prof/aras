@@ -177,7 +177,7 @@ async def root():
         "message": f"Welcome to {settings.agent_name} Agent API",
         "version": "0.1.0",
         "status": "running",
-        "websocket_url": f"ws://localhost:{settings.websocket_port}/ws"
+        "websocket_url": f"ws://localhost:{settings.http_port}/ws"
     }
 
 
@@ -386,7 +386,7 @@ async def get_ui():
             let sessionId = null;
             
             function connect() {
-                ws = new WebSocket('ws://localhost:8765/ws');
+                ws = new WebSocket('ws://localhost:8000/ws');
                 
                 ws.onopen = function(event) {
                     document.getElementById('status').textContent = 'Connected';

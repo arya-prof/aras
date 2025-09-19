@@ -116,19 +116,19 @@ class VoiceCommandProcessor:
                 self.recognizer = sr.Recognizer()
                 self.microphone = sr.Microphone()
                 
-                # Configure recognizer for better accuracy
-                self.recognizer.energy_threshold = 300  # Lower threshold for quieter speech
+                # Configure recognizer for better accuracy and fewer false triggers
+                self.recognizer.energy_threshold = 400  # Higher threshold to reduce false triggers
                 self.recognizer.dynamic_energy_threshold = True
-                self.recognizer.dynamic_energy_adjustment_damping = 0.15
-                self.recognizer.dynamic_energy_ratio = 1.5
-                self.recognizer.pause_threshold = 0.8  # Longer pause before considering speech complete
-                self.recognizer.operation_timeout = None  # No timeout for operations
-                self.recognizer.phrase_threshold = 0.3  # Minimum length of audio to consider
-                self.recognizer.non_speaking_duration = 0.5  # Silence before considering phrase complete
+                self.recognizer.dynamic_energy_adjustment_damping = 0.2
+                self.recognizer.dynamic_energy_ratio = 1.8
+                self.recognizer.pause_threshold = 1.0  # Longer pause before considering speech complete
+                self.recognizer.operation_timeout = 3  # 3 second timeout for operations
+                self.recognizer.phrase_threshold = 0.5  # Higher minimum length to reduce false triggers
+                self.recognizer.non_speaking_duration = 0.8  # Longer silence before considering phrase complete
                 
                 self.voice_enabled = True
                 print("Voice recognition initialized successfully")
-                print("Voice settings: energy_threshold=300, pause_threshold=0.8, phrase_threshold=0.3")
+                print("Voice settings: energy_threshold=400, pause_threshold=1.0, phrase_threshold=0.5")
             except Exception as e:
                 print(f"Failed to initialize voice recognition: {e}")
                 self.voice_enabled = False
@@ -193,7 +193,13 @@ class VoiceCommandProcessor:
                         print("Try: 'home status', 'show home', 'what's the home status'")
                         
                 except sr.UnknownValueError:
-                    # Speech was unintelligible - try to get partial results
+                    # Speech was unintelligible - only show error if it's likely a real command attempt
+                    # Check if the audio has enough energy to be considered speech
+                    if hasattr(audio, 'get_raw_data'):
+                        audio_data = audio.get_raw_data()
+                        if len(audio_data) > 1000:  # Only show error for substantial audio
+                            print("❌ Speech was unintelligible")
+                    # Try to get partial results
                     try:
                         text = self.recognizer.recognize_google(audio, language="en-US", show_all=True)
                         if text and 'alternative' in text:

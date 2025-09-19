@@ -18,7 +18,7 @@ def main():
     parser.add_argument(
         "--mode", 
         choices=["server", "ui", "headless", "both"], 
-        default="headless",
+        default="both",
         help="Run mode: server only, full UI, headless UI, or both"
     )
     parser.add_argument(
@@ -67,7 +67,7 @@ def run_server(host: str, http_port: int, websocket_port: int):
     
     print(f"Starting {settings.agent_name} Agent Server")
     print(f"HTTP: http://{host}:{http_port}")
-    print(f"WebSocket: ws://{host}:{websocket_port}/ws")
+    print(f"WebSocket: ws://{host}:{http_port}/ws")
     print(f"UI: http://{host}:{http_port}/ui")
     
     uvicorn.run(
