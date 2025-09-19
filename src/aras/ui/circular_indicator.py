@@ -30,6 +30,7 @@ class CircularIndicator(QWidget):
         self._last_command = ""
         self._last_response = ""
         
+        
         # Colors
         self.active_color = QColor(0, 255, 100)  # Green when active
         self.inactive_color = QColor(100, 100, 100)  # Gray when inactive
@@ -181,18 +182,36 @@ class CircularIndicator(QWidget):
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "A")
     
     def mousePressEvent(self, event):
-        """Handle mouse press events."""
-        # Click handling removed - no action on click
+        """Handle mouse press events - pass to parent window for dragging."""
+        # Pass mouse events to parent window for dragging
+        if self.parent():
+            self.parent().mousePressEvent(event)
         super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        """Handle mouse move events - pass to parent window for dragging."""
+        # Pass mouse events to parent window for dragging
+        if self.parent():
+            self.parent().mouseMoveEvent(event)
+        super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release events - pass to parent window for dragging."""
+        # Pass mouse events to parent window for dragging
+        if self.parent():
+            self.parent().mouseReleaseEvent(event)
+        super().mouseReleaseEvent(event)
     
     def enterEvent(self, event):
         """Handle mouse enter events."""
-        # No cursor change needed since clicking is disabled
+        if self.parent():
+            self.parent().enterEvent(event)
         super().enterEvent(event)
     
     def leaveEvent(self, event):
         """Handle mouse leave events."""
-        # No cursor change needed since clicking is disabled
+        if self.parent():
+            self.parent().leaveEvent(event)
         super().leaveEvent(event)
 
 
@@ -233,6 +252,10 @@ class HeadlessAgentWindow(QWidget):
         self.voice_listening = False
         self.voice_processing = False
         self._processing_voice_command = False
+        
+        # Dragging properties for the main window
+        self._dragging = False
+        self._drag_start_position = None
     
     def position_window(self):
         """Position the window in the center of the screen."""
@@ -288,3 +311,36 @@ class HeadlessAgentWindow(QWidget):
         """Set the agent status externally."""
         self.agent_active = active
         self.indicator.set_active(active)
+    
+    def mousePressEvent(self, event):
+        """Handle mouse press events for dragging."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._drag_start_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        """Handle mouse move events for dragging."""
+        if self._dragging and event.buttons() & Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_start_position)
+        super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release events."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+        super().mouseReleaseEvent(event)
+    
+    def enterEvent(self, event):
+        """Handle mouse enter events."""
+        if not self._dragging:
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """Handle mouse leave events."""
+        if not self._dragging:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().leaveEvent(event)
