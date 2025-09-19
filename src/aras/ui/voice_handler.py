@@ -411,14 +411,14 @@ class VoiceCommandProcessor:
                 with self.microphone as source:
                     self.recognizer.adjust_for_ambient_noise(source, duration=1)
                 
-                # Keep the working settings that were successful
+                # Use optimized settings for better speech end detection
                 self.recognizer.energy_threshold = 300
                 self.recognizer.dynamic_energy_threshold = True
                 self.recognizer.dynamic_energy_adjustment_damping = 0.15
                 self.recognizer.dynamic_energy_ratio = 1.5
-                self.recognizer.pause_threshold = 0.8
+                self.recognizer.pause_threshold = 0.6  # Shorter pause to detect end of speech faster
                 self.recognizer.phrase_threshold = 0.3
-                self.recognizer.non_speaking_duration = 0.8
+                self.recognizer.non_speaking_duration = 0.6  # Shorter duration to detect silence faster
                 
                 self._microphone_initialized = True
                 print(f"Microphone initialized successfully. Energy threshold: {self.recognizer.energy_threshold}")
@@ -440,6 +440,22 @@ class VoiceCommandProcessor:
             self.voice_thread.daemon = True
             self.voice_thread.start()
             print("Continuous voice listening started")
+    
+    def pause_listening(self):
+        """Pause voice listening temporarily."""
+        self.is_listening = False
+        print("Voice listening paused")
+    
+    def resume_listening(self):
+        """Resume voice listening."""
+        if not self.voice_enabled:
+            return
+        self.is_listening = True
+        if not self.voice_thread or not self.voice_thread.is_alive():
+            self.voice_thread = threading.Thread(target=self._voice_listening_loop)
+            self.voice_thread.daemon = True
+            self.voice_thread.start()
+        print("Voice listening resumed")
     
     def start_background_listening(self):
         """Start background listening for wake words."""
@@ -489,12 +505,15 @@ class VoiceCommandProcessor:
         
         print(f"Voice recognition started. Energy threshold: {self.recognizer.energy_threshold}")
         print("Available commands: 'home status', 'show system info', 'search for weather', etc.")
+        print("Note: Long audio support enabled (up to 30 seconds per command)")
+        print("Tip: Pause briefly after speaking to help detection")
         
         while self.is_listening:
             try:
-                # Listen for audio like awsmarthome
+                # Listen for audio with shorter timeout for more responsive detection
                 with self.microphone as source:
-                    audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=5)
+                    # Use shorter timeout but longer phrase limit for better responsiveness
+                    audio = self.recognizer.listen(source, timeout=0.5, phrase_time_limit=30)
                 
                 # Recognize speech using the same approach as awsmarthome
                 try:
@@ -515,7 +534,10 @@ class VoiceCommandProcessor:
                 except sr.RequestError as e:
                     print(f"Error: Speech recognition service error: {e}")
                 except Exception as e:
-                    print(f"Error: Unexpected error: {e}")
+                    print(f"Error: Unexpected error in voice recognition: {e}")
+                    # Log audio duration for debugging
+                    if hasattr(audio, 'duration'):
+                        print(f"Audio duration: {audio.duration:.2f} seconds")
                     
             except sr.WaitTimeoutError:
                 # This is normal - just continue listening
@@ -523,7 +545,7 @@ class VoiceCommandProcessor:
             except Exception as e:
                 if "timeout" not in str(e).lower():
                     print(f"Error: Error in voice listening loop: {e}")
-                time.sleep(0.5)  # Short wait before retrying
+                time.sleep(0.1)  # Shorter wait for more responsive detection
     
     def process_audio_input(self, audio_data: bytes) -> bool:
         """Process audio input and return True if home status was requested."""
@@ -543,6 +565,36 @@ class VoiceCommandProcessor:
         """Process text input and return True if home status was requested."""
         return self.handler.process_text_command(text)
     
+    def manual_trigger_listening(self):
+        """Manually trigger a single voice command capture."""
+        if not self.voice_enabled or not self.recognizer or not self.microphone:
+            print("Error: Voice recognition not available")
+            return
+        
+        print("Manual trigger: Listening for command...")
+        try:
+            with self.microphone as source:
+                audio = self.recognizer.listen(source, timeout=2, phrase_time_limit=30)
+            
+            try:
+                text = self.recognizer.recognize_google(audio, language="en-US")
+                print(f"You: {text}")
+                
+                if self.handler.process_voice_command(text):
+                    print("Voice command processed successfully!")
+                else:
+                    print(f"Command not recognized: '{text}'")
+                    
+            except sr.UnknownValueError:
+                print("Could not understand audio")
+            except sr.RequestError as e:
+                print(f"Error: Speech recognition service error: {e}")
+                
+        except sr.WaitTimeoutError:
+            print("No speech detected within timeout")
+        except Exception as e:
+            print(f"Error: {e}")
+    
     def set_home_status_callback(self, callback: Callable):
         """Set the callback for home status requests."""
         self.handler.set_home_status_callback(callback)
@@ -554,20 +606,20 @@ class VoiceCommandProcessor:
         
         print("Background listening started - waiting for wake words...")
         
-        # Use the working settings from before
+        # Use optimized settings for better speech end detection
         self.recognizer.energy_threshold = 300
         self.recognizer.dynamic_energy_threshold = True
         self.recognizer.dynamic_energy_adjustment_damping = 0.15
         self.recognizer.dynamic_energy_ratio = 1.5
-        self.recognizer.pause_threshold = 0.8
+        self.recognizer.pause_threshold = 0.6  # Shorter pause to detect end of speech faster
         self.recognizer.phrase_threshold = 0.3
-        self.recognizer.non_speaking_duration = 0.8
+        self.recognizer.non_speaking_duration = 0.6  # Shorter duration to detect silence faster
         
         while self.is_background_listening:
             try:
-                # Listen for audio with working timeout
+                # Listen for audio with increased time limit for long speech
                 with self.microphone as source:
-                    audio = self.recognizer.listen(source, timeout=2, phrase_time_limit=5)
+                    audio = self.recognizer.listen(source, timeout=2, phrase_time_limit=30)
                 
                 try:
                     # Recognize speech using the same approach as awsmarthome
