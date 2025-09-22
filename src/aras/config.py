@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     ui_theme: str = Field(default="dark", env="UI_THEME")
     ui_scale: float = Field(default=1.0, env="UI_SCALE")
     
+    # Voice Configuration
+    default_voice: str = Field(default="Zira", env="DEFAULT_VOICE")
+    voice_rate: int = Field(default=0, env="VOICE_RATE")  # -10 to 10, 0 is normal
+    voice_volume: int = Field(default=100, env="VOICE_VOLUME")  # 0 to 100
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

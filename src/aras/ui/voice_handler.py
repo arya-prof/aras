@@ -104,12 +104,23 @@ class VoiceCommandHandler(QObject):
             self.tts_engine.setProperty('rate', 150)
             self.tts_engine.setProperty('volume', 1.0)  # Max volume
             
-            # Try to set a specific voice for better audio
+            # Try to set Zira voice specifically
             voices = self.tts_engine.getProperty('voices')
             if voices:
-                # Use the first available voice
-                self.tts_engine.setProperty('voice', voices[0].id)
-                print(f"TTS initialized with voice: {voices[0].name}")
+                # Look for Zira voice specifically
+                zira_voice = None
+                for voice in voices:
+                    if 'zira' in voice.name.lower():
+                        zira_voice = voice
+                        break
+                
+                if zira_voice:
+                    self.tts_engine.setProperty('voice', zira_voice.id)
+                    print(f"TTS initialized with Zira voice: {zira_voice.name}")
+                else:
+                    # Fallback to first available voice
+                    self.tts_engine.setProperty('voice', voices[0].id)
+                    print(f"TTS initialized with voice: {voices[0].name} (Zira not found)")
         except ImportError:
             print("pyttsx3 not available for TTS")
         
@@ -671,8 +682,16 @@ Current context: {settings.owner_name} is interacting with you via voice command
                     with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False) as f:
                         f.write(f'''Add-Type -AssemblyName System.Speech
 $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$synth.Rate = 0
-$synth.Volume = 100
+$synth.Rate = {settings.voice_rate}
+$synth.Volume = {settings.voice_volume}
+
+# Try to set Zira voice
+$voices = $synth.GetInstalledVoices()
+$ziraVoice = $voices | Where-Object {{ $_.VoiceInfo.Name -like "*Zira*" }}
+if ($ziraVoice) {{
+    $synth.SelectVoice($ziraVoice.VoiceInfo.Name)
+}}
+
 $synth.Speak(@"
 {text}
 "@)

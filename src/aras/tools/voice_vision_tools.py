@@ -77,12 +77,16 @@ class SpeechProcessingTool(AsyncTool):
         except Exception as e:
             raise RuntimeError(f"Speech-to-text conversion failed: {e}")
     
-    async def _text_to_speech(self, text: str, voice: str = "alloy", output_file: Optional[str] = None) -> Dict[str, Any]:
-        """Convert text to speech using OpenAI TTS."""
+    async def _text_to_speech(self, text: str, voice: str = "zira", output_file: Optional[str] = None) -> Dict[str, Any]:
+        """Convert text to speech using OpenAI TTS or Windows TTS for Zira voice."""
         if not text:
             raise ValueError("text is required")
         
-        # Check for API key and configure client
+        # Handle Zira voice using Windows TTS
+        if voice.lower() == "zira":
+            return await self._text_to_speech_windows(text, output_file)
+        
+        # Check for API key and configure client for OpenAI voices
         if settings.use_grok and settings.grok_api_key:
             openai.api_key = settings.grok_api_key
             openai.api_base = settings.grok_base_url
@@ -119,6 +123,58 @@ class SpeechProcessingTool(AsyncTool):
         except Exception as e:
             raise RuntimeError(f"Text-to-speech conversion failed: {e}")
     
+    async def _text_to_speech_windows(self, text: str, output_file: Optional[str] = None) -> Dict[str, Any]:
+        """Convert text to speech using Windows TTS with Zira voice."""
+        import tempfile
+        import subprocess
+        import os
+        
+        if not output_file:
+            output_file = f"tts_output_{hash(text)}.wav"
+        
+        try:
+            # Create a temporary PowerShell script file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False) as f:
+                f.write(f'''Add-Type -AssemblyName System.Speech
+$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$synth.Rate = {settings.voice_rate}
+$synth.Volume = {settings.voice_volume}
+
+# Try to set Zira voice
+$voices = $synth.GetInstalledVoices()
+$ziraVoice = $voices | Where-Object {{ $_.VoiceInfo.Name -like "*Zira*" }}
+if ($ziraVoice) {{
+    $synth.SelectVoice($ziraVoice.VoiceInfo.Name)
+}}
+
+# Save to file instead of speaking
+$synth.SetOutputToWaveFile("{output_file}")
+$synth.Speak(@"
+{text}
+"@)
+$synth.Dispose()''')
+                script_path = f.name
+            
+            # Execute the PowerShell script
+            cmd = f'powershell -ExecutionPolicy Bypass -File "{script_path}"'
+            subprocess.run(cmd, shell=True, check=True, timeout=15)
+            
+            # Clean up the temporary file
+            try:
+                os.unlink(script_path)
+            except:
+                pass
+            
+            return {
+                "success": True,
+                "text": text,
+                "voice": "zira",
+                "output_file": output_file,
+                "model": "windows_tts"
+            }
+        except Exception as e:
+            raise RuntimeError(f"Windows TTS conversion failed: {e}")
+    
     def get_parameters_schema(self) -> Dict[str, Any]:
         """Get parameters schema."""
         return {
@@ -144,9 +200,9 @@ class SpeechProcessingTool(AsyncTool):
                 },
                 "voice": {
                     "type": "string",
-                    "enum": ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
-                    "default": "alloy",
-                    "description": "Voice to use for TTS (alloy, echo, fable, onyx, nova, shimmer)"
+                    "enum": ["alloy", "echo", "fable", "onyx", "nova", "shimmer", "zira"],
+                    "default": "zira",
+                    "description": "Voice to use for TTS (alloy, echo, fable, onyx, nova, shimmer, zira)"
                 },
                 "output_file": {
                     "type": "string",
