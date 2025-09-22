@@ -4,6 +4,7 @@ Tool registry for managing all available tools.
 
 from .base import ToolRegistry
 from .system_tools import FileOperationsTool, ProcessManagementTool, SystemControlTool
+from .file_tools import FileCreateRemoveTool
 from .web_tools import WebSearchTool, BrowserAutomationTool, APITool
 from .home_tools import DeviceControlTool, SceneManagementTool, ClimateControlTool
 from .communication_tools import EmailTool, NotificationTool
@@ -19,6 +20,7 @@ def create_tool_registry() -> ToolRegistry:
     
     # System tools
     registry.register_tool(FileOperationsTool())
+    registry.register_tool(FileCreateRemoveTool())
     registry.register_tool(ProcessManagementTool())
     registry.register_tool(SystemControlTool())
     

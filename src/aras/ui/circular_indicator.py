@@ -3,6 +3,7 @@ Circular indicator widget for headless agent status display.
 """
 
 import sys
+import asyncio
 from PyQt6.QtWidgets import QWidget, QApplication, QLabel, QVBoxLayout
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QRadialGradient, QFont
@@ -272,11 +273,25 @@ class HeadlessAgentWindow(QWidget):
         # Setup voice command processor
         self.voice_processor = VoiceCommandProcessor()
         
+        # Setup tool registry for voice commands
+        from ..tools.registry import create_tool_registry
+        self.tool_registry = create_tool_registry()
+        
+        # Add desktop as a safe directory for file operations
+        from pathlib import Path
+        desktop_path = Path.home() / 'Desktop'
+        file_tool = self.tool_registry.get_tool("file_create_remove")
+        if file_tool:
+            file_tool.add_safe_directory(str(desktop_path))
+        
+        self.voice_processor.handler.set_tool_registry(self.tool_registry)
+        
         # Connect voice signals
         self.voice_processor.handler.command_processed.connect(self.on_command_processed)
         self.voice_processor.handler.voice_response.connect(self.on_voice_response)
         self.voice_processor.handler.speaking_started.connect(self.on_speaking_started)
         self.voice_processor.handler.speaking_stopped.connect(self.on_speaking_stopped)
+        self.voice_processor.handler.file_operation_requested.connect(self.on_file_operation_requested)
         
         # Start background listening for wake words
         self.voice_processor.start_background_listening()
@@ -443,6 +458,67 @@ class HeadlessAgentWindow(QWidget):
         self.voice_processing = False
         self.indicator.set_voice_processing(False)
         self.update_status_text()
+    
+    def on_file_operation_requested(self, operation: str, parameters: dict):
+        """Handle file operation request from voice command."""
+        import time
+        timestamp = int(time.time() * 1000)
+        print(f"[DEBUG-UI-{timestamp}] FILE_OPERATION_REQUESTED: {operation} with parameters: {parameters}")
+        
+        # Set processing state
+        self.voice_processing = True
+        self.indicator.set_voice_processing(True)
+        self.update_status_text()
+        
+        # Execute file operation asynchronously using QTimer to avoid blocking
+        QTimer.singleShot(0, lambda: asyncio.run(self.execute_file_operation(operation, parameters)))
+    
+    async def execute_file_operation(self, operation: str, parameters: dict):
+        """Execute file operation using the agent's tools."""
+        try:
+            # Import here to avoid circular imports
+            from ..core.agent import ArasAgent
+            from ..models import UserInput, MessageType
+            
+            # Create agent instance
+            agent = ArasAgent()
+            await agent.initialize()
+            
+            # Create a user input message for the file operation
+            command_text = f"Execute file operation: {operation}"
+            if parameters.get('path'):
+                command_text += f" on path: {parameters['path']}"
+            
+            message = UserInput(
+                id=f"file_op_{int(time.time() * 1000)}",
+                type=MessageType.USER_INPUT,
+                content=command_text,
+                input_type="voice",
+                session_id="voice_session"
+            )
+            
+            # Execute the file operation using the agent
+            response = await agent.process_message(message)
+            
+            # Provide feedback via TTS
+            if hasattr(self, 'voice_processor') and hasattr(self.voice_processor, 'handler'):
+                self.voice_processor.handler.speak_response(f"File operation completed: {response}")
+            
+            print(f"[DEBUG-UI] FILE_OPERATION_COMPLETED: {response}")
+            
+        except Exception as e:
+            error_msg = f"Error executing file operation: {str(e)}"
+            print(f"[DEBUG-UI] FILE_OPERATION_ERROR: {error_msg}")
+            
+            # Provide error feedback via TTS
+            if hasattr(self, 'voice_processor') and hasattr(self.voice_processor, 'handler'):
+                self.voice_processor.handler.speak_response(f"Sorry, I couldn't complete the file operation: {error_msg}")
+        
+        finally:
+            # Reset processing state
+            self.voice_processing = False
+            self.indicator.set_voice_processing(False)
+            self.update_status_text()
     
     def process_text_command(self, text: str) -> bool:
         """Process a text command and return True if handled."""

@@ -13,9 +13,10 @@ from telethon import TelegramClient, events
 from telethon.tl.types import (
     User, Chat, Channel, Message, 
     InputPeerUser, InputPeerChat, InputPeerChannel,
-    MessageMediaPhoto, MessageMediaDocument, MessageMediaWebPage
+    MessageMediaPhoto, MessageMediaDocument, MessageMediaWebPage,
+    ChatBannedRights
 )
-from telethon.tl.functions.channels import CreateChannelRequest, InviteToChannelRequest, KickFromChannelRequest
+from telethon.tl.functions.channels import CreateChannelRequest, InviteToChannelRequest, EditBannedRequest
 from telethon.errors import (
     SessionPasswordNeededError, PhoneCodeInvalidError,
     FloodWaitError, ChatAdminRequiredError, UserNotParticipantError,
@@ -365,7 +366,7 @@ class TelegramTool(AsyncTool):
         for user in users:
             try:
                 user_entity = await self._get_entity(user)
-                await self.client(KickFromChannelRequest(entity, user_entity))
+                await self.client(EditBannedRequest(entity, user_entity, ChatBannedRights(until_date=None, view_messages=True)))
                 removed_users.append(str(user))
             except Exception as e:
                 logger.warning(f"Failed to remove user {user}: {e}")

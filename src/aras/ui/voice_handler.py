@@ -25,6 +25,7 @@ class VoiceCommandHandler(QObject):
     """Handles voice commands with GPT-4 integration and triggers appropriate actions."""
     
     home_status_requested = pyqtSignal()
+    file_operation_requested = pyqtSignal(str, dict)  # operation, parameters
     command_processed = pyqtSignal(str, dict)  # command, result
     voice_response = pyqtSignal(str)  # TTS response
     speaking_started = pyqtSignal()  # When TTS starts speaking
@@ -33,8 +34,10 @@ class VoiceCommandHandler(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.home_status_callback: Optional[Callable] = None
+        self.file_operation_callback: Optional[Callable] = None
         self.openai_client = None
         self.tts_engine = None
+        self.tool_registry = None  # Will be set by the UI
         
         # Initialize LLM client (supports OpenAI, OpenRouter, Grok, and Ollama)
         self.llm_client = None
@@ -141,12 +144,102 @@ class VoiceCommandHandler(QObject):
             r"hello.*voice"
         ]
         
+        # File operation patterns for voice commands
+        self.file_operation_patterns = [
+            # File creation patterns
+            r"create.*file.*(.+)",
+            r"make.*file.*(.+)",
+            r"new.*file.*(.+)",
+            r"write.*file.*(.+)",
+            r"save.*file.*(.+)",
+            r"create.*a.*file.*(.+)",
+            r"make.*a.*file.*(.+)",
+            r"new.*a.*file.*(.+)",
+            r"write.*a.*file.*(.+)",
+            r"save.*a.*file.*(.+)",
+            
+            # Directory creation patterns
+            r"create.*folder.*(.+)",
+            r"create.*directory.*(.+)",
+            r"make.*folder.*(.+)",
+            r"make.*directory.*(.+)",
+            r"new.*folder.*(.+)",
+            r"new.*directory.*(.+)",
+            r"create.*a.*folder.*(.+)",
+            r"create.*a.*directory.*(.+)",
+            r"make.*a.*folder.*(.+)",
+            r"make.*a.*directory.*(.+)",
+            r"new.*a.*folder.*(.+)",
+            r"new.*a.*directory.*(.+)",
+            
+            # File deletion patterns
+            r"delete.*file.*(.+)",
+            r"remove.*file.*(.+)",
+            r"delete.*(.+)",
+            r"remove.*(.+)",
+            r"delete.*the.*file.*(.+)",
+            r"remove.*the.*file.*(.+)",
+            r"delete.*a.*file.*(.+)",
+            r"remove.*a.*file.*(.+)",
+            
+            # Directory deletion patterns
+            r"delete.*folder.*(.+)",
+            r"delete.*directory.*(.+)",
+            r"remove.*folder.*(.+)",
+            r"remove.*directory.*(.+)",
+            r"delete.*the.*folder.*(.+)",
+            r"delete.*the.*directory.*(.+)",
+            r"remove.*the.*folder.*(.+)",
+            r"remove.*the.*directory.*(.+)",
+            r"delete.*a.*folder.*(.+)",
+            r"delete.*a.*directory.*(.+)",
+            r"remove.*a.*folder.*(.+)",
+            r"remove.*a.*directory.*(.+)",
+            
+            # File existence check patterns
+            r"does.*file.*(.+).*exist",
+            r"is.*file.*(.+).*there",
+            r"check.*if.*file.*(.+).*exists",
+            r"file.*(.+).*exist",
+            r"does.*(.+).*exist",
+            r"is.*(.+).*there",
+            r"check.*(.+).*exists",
+            
+            # File info patterns
+            r"info.*about.*file.*(.+)",
+            r"file.*info.*(.+)",
+            r"details.*about.*file.*(.+)",
+            r"tell.*me.*about.*file.*(.+)",
+            r"what.*about.*file.*(.+)",
+            r"show.*me.*file.*(.+)",
+            r"file.*(.+).*info",
+            r"file.*(.+).*details",
+            
+            # General file operation patterns
+            r"file.*operation",
+            r"file.*management",
+            r"file.*system",
+            r"file.*work",
+            r"work.*with.*files",
+            r"manage.*files",
+            r"handle.*files"
+        ]
+        
         # Compile patterns for efficiency
-        self.compiled_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns]
+        self.compiled_home_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns]
+        self.compiled_file_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns]
     
     def set_home_status_callback(self, callback: Callable):
         """Set the callback function for home status requests."""
         self.home_status_callback = callback
+    
+    def set_file_operation_callback(self, callback: Callable):
+        """Set the callback function for file operation requests."""
+        self.file_operation_callback = callback
+    
+    def set_tool_registry(self, tool_registry):
+        """Set the tool registry for executing tools."""
+        self.tool_registry = tool_registry
     
     def process_voice_command(self, text: str) -> bool:
         """Process a voice command using GPT-4 and return True if handled."""
@@ -189,11 +282,23 @@ class VoiceCommandHandler(QObject):
         # Fallback to pattern matching
         print(f"[DEBUG-{command_id}] PATTERN_MATCHING: Starting pattern matching")
         text_lower = text.lower()
-        for i, pattern in enumerate(self.compiled_patterns):
+        
+        # Check home status patterns
+        for i, pattern in enumerate(self.compiled_home_patterns):
             if pattern.search(text_lower):
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Pattern {i+1}: {self.home_status_patterns[i]}")
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Home pattern {i+1}: {self.home_status_patterns[i]}")
                 print(f"[DEBUG-{command_id}] TRIGGER_HOME_STATUS: Triggering home status")
                 self.trigger_home_status()
+                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
+                return True
+        
+        # Check file operation patterns
+        for i, pattern in enumerate(self.compiled_file_patterns):
+            match = pattern.search(text_lower)
+            if match:
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: File pattern {i+1}: {self.file_operation_patterns[i]}")
+                print(f"[DEBUG-{command_id}] TRIGGER_FILE_OPERATION: Triggering file operation")
+                self.trigger_file_operation(text, match)
                 print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
         
@@ -305,12 +410,32 @@ Current context: {settings.owner_name} is interacting with you via voice command
                 action_result['action_taken'] = True
             
             # File operations
-            elif any(word in command_lower for word in ['file', 'folder', 'directory', 'create', 'delete', 'list']):
+            elif any(word in command_lower for word in ['file', 'folder', 'directory', 'create', 'delete', 'remove', 'list', 'write', 'save', 'make', 'new']):
                 action_result['actions'].append({
                     'type': 'file_operation',
-                    'description': 'Perform file system operations'
+                    'description': 'Perform file system operations',
+                    'command': command,
+                    'details': 'File creation, deletion, or management operation'
                 })
                 action_result['action_taken'] = True
+                
+                # Try to extract file operation details and execute
+                if any(word in command_lower for word in ['create', 'make', 'new', 'write', 'save']):
+                    if any(word in command_lower for word in ['file']):
+                        action_result['file_operation'] = 'create_file'
+                        # Execute file creation
+                        self._execute_file_creation(command, action_result)
+                    elif any(word in command_lower for word in ['folder', 'directory']):
+                        action_result['file_operation'] = 'create_directory'
+                        # Execute directory creation
+                        self._execute_directory_creation(command, action_result)
+                elif any(word in command_lower for word in ['delete', 'remove']):
+                    if any(word in command_lower for word in ['file']):
+                        action_result['file_operation'] = 'remove_file'
+                    elif any(word in command_lower for word in ['folder', 'directory']):
+                        action_result['file_operation'] = 'remove_directory'
+                elif any(word in command_lower for word in ['exist', 'check', 'info', 'details']):
+                    action_result['file_operation'] = 'check_file'
             
             # Web search
             elif any(word in command_lower for word in ['search', 'google', 'find', 'look up', 'web']):
@@ -332,6 +457,195 @@ Current context: {settings.owner_name} is interacting with you via voice command
             
         except Exception as e:
             return {'action_taken': False, 'actions': [], 'error': str(e)}
+    
+    def _execute_file_creation(self, command: str, action_result: Dict[str, Any]):
+        """Execute file creation using the tool registry."""
+        try:
+            if not self.tool_registry:
+                print("[DEBUG-FILE] ERROR: No tool registry available")
+                return
+            
+            # Extract filename from command
+            filename = self._extract_filename_from_command(command)
+            if not filename:
+                print("[DEBUG-FILE] ERROR: Could not extract filename from command")
+                return
+            
+            # Determine file path (default to desktop if not specified)
+            file_path = self._get_file_path(filename, command)
+            
+            # Get the file creation tool
+            tool = self.tool_registry.get_tool("file_create_remove")
+            if not tool:
+                print("[DEBUG-FILE] ERROR: File creation tool not found")
+                return
+            
+            # Prepare parameters
+            parameters = {
+                "operation": "create_file",
+                "path": file_path,
+                "content": "",  # Empty file
+                "encoding": "utf-8"
+            }
+            
+            print(f"[DEBUG-FILE] EXECUTING: Creating file at {file_path}")
+            
+            # Execute the tool asynchronously
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(tool.execute(parameters))
+                print(f"[DEBUG-FILE] RESULT: {result}")
+                
+                # Update action result with execution details
+                action_result['execution_results'].append({
+                    'tool': 'file_create_remove',
+                    'operation': 'create_file',
+                    'path': file_path,
+                    'result': result
+                })
+                
+            finally:
+                loop.close()
+                
+        except Exception as e:
+            print(f"[DEBUG-FILE] ERROR: File creation failed: {e}")
+            action_result['execution_results'].append({
+                'tool': 'file_create_remove',
+                'operation': 'create_file',
+                'error': str(e)
+            })
+    
+    def _execute_directory_creation(self, command: str, action_result: Dict[str, Any]):
+        """Execute directory creation using the tool registry."""
+        try:
+            if not self.tool_registry:
+                print("[DEBUG-FILE] ERROR: No tool registry available")
+                return
+            
+            # Extract directory name from command
+            dirname = self._extract_directory_name_from_command(command)
+            if not dirname:
+                print("[DEBUG-FILE] ERROR: Could not extract directory name from command")
+                return
+            
+            # Determine directory path
+            dir_path = self._get_directory_path(dirname, command)
+            
+            # Get the file creation tool
+            tool = self.tool_registry.get_tool("file_create_remove")
+            if not tool:
+                print("[DEBUG-FILE] ERROR: File creation tool not found")
+                return
+            
+            # Prepare parameters
+            parameters = {
+                "operation": "create_directory",
+                "path": dir_path
+            }
+            
+            print(f"[DEBUG-FILE] EXECUTING: Creating directory at {dir_path}")
+            
+            # Execute the tool asynchronously
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(tool.execute(parameters))
+                print(f"[DEBUG-FILE] RESULT: {result}")
+                
+                # Update action result with execution details
+                action_result['execution_results'].append({
+                    'tool': 'file_create_remove',
+                    'operation': 'create_directory',
+                    'path': dir_path,
+                    'result': result
+                })
+                
+            finally:
+                loop.close()
+                
+        except Exception as e:
+            print(f"[DEBUG-FILE] ERROR: Directory creation failed: {e}")
+            action_result['execution_results'].append({
+                'tool': 'file_create_remove',
+                'operation': 'create_directory',
+                'error': str(e)
+            })
+    
+    def _extract_filename_from_command(self, command: str) -> str:
+        """Extract filename from voice command."""
+        import re
+        
+        # Look for patterns like "hello.txt", "hello dot txt", "hello Dot txt"
+        patterns = [
+            r'(\w+(?:\s+dot\s+)?\w+\.\w+)',  # hello.txt or hello dot txt
+            r'(\w+(?:\s+dot\s+)?\w+)\s+(?:file|txt)',  # hello file or hello txt
+            r'name\s+it\s+(\w+(?:\s+dot\s+)?\w+)',  # name it hello
+            r'create\s+(\w+(?:\s+dot\s+)?\w+)',  # create hello
+            r'make\s+(\w+(?:\s+dot\s+)?\w+)',  # make hello
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, command.lower())
+            if match:
+                filename = match.group(1)
+                # Convert "dot" to "."
+                filename = re.sub(r'\s+dot\s+', '.', filename)
+                # Add .txt extension if not present
+                if '.' not in filename:
+                    filename += '.txt'
+                return filename
+        
+        return None
+    
+    def _extract_directory_name_from_command(self, command: str) -> str:
+        """Extract directory name from voice command."""
+        import re
+        
+        patterns = [
+            r'(\w+)\s+(?:folder|directory)',  # hello folder
+            r'create\s+(\w+)\s+(?:folder|directory)',  # create hello folder
+            r'make\s+(\w+)\s+(?:folder|directory)',  # make hello folder
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, command.lower())
+            if match:
+                return match.group(1)
+        
+        return None
+    
+    def _get_file_path(self, filename: str, command: str) -> str:
+        """Get the full file path based on command context."""
+        import os
+        from pathlib import Path
+        
+        # Check if desktop is mentioned
+        if 'desktop' in command.lower():
+            desktop_path = Path.home() / 'Desktop'
+            return str(desktop_path / filename)
+        
+        # Check if specific path is mentioned
+        # For now, default to desktop
+        desktop_path = Path.home() / 'Desktop'
+        return str(desktop_path / filename)
+    
+    def _get_directory_path(self, dirname: str, command: str) -> str:
+        """Get the full directory path based on command context."""
+        import os
+        from pathlib import Path
+        
+        # Check if desktop is mentioned
+        if 'desktop' in command.lower():
+            desktop_path = Path.home() / 'Desktop'
+            return str(desktop_path / dirname)
+        
+        # Check if specific path is mentioned
+        # For now, default to desktop
+        desktop_path = Path.home() / 'Desktop'
+        return str(desktop_path / dirname)
     
     def speak_response(self, text: str):
         """Convert text to speech with persistent audio output."""
@@ -453,6 +767,112 @@ $synth.Dispose()''')
         # Emit the signal to trigger home status
         self.home_status_requested.emit()
         print("Signal emitted for home status")
+    
+    def trigger_file_operation(self, text: str, match):
+        """Trigger a file operation based on voice command."""
+        print(f"Triggering file operation for: '{text}'")
+        
+        # Extract the file path from the match
+        file_path = ""
+        if match.groups():
+            file_path = match.group(1).strip()
+        
+        # Determine operation type based on the text
+        text_lower = text.lower()
+        operation = None
+        parameters = {}
+        
+        # File creation
+        if any(word in text_lower for word in ['create', 'make', 'new', 'write', 'save']) and any(word in text_lower for word in ['file']):
+            operation = "create_file"
+            parameters = {
+                "operation": "create_file",
+                "path": file_path,
+                "content": "",  # Default empty content
+                "encoding": "utf-8"
+            }
+            if not file_path:
+                # Ask for file name
+                self.speak_response("What would you like to name the file?")
+                return
+        
+        # Directory creation
+        elif any(word in text_lower for word in ['create', 'make', 'new']) and any(word in text_lower for word in ['folder', 'directory']):
+            operation = "create_directory"
+            parameters = {
+                "operation": "create_directory",
+                "path": file_path
+            }
+            if not file_path:
+                # Ask for directory name
+                self.speak_response("What would you like to name the folder?")
+                return
+        
+        # File deletion
+        elif any(word in text_lower for word in ['delete', 'remove']) and any(word in text_lower for word in ['file']):
+            operation = "remove_file"
+            parameters = {
+                "operation": "remove_file",
+                "path": file_path
+            }
+            if not file_path:
+                # Ask for file name
+                self.speak_response("Which file would you like to delete?")
+                return
+        
+        # Directory deletion
+        elif any(word in text_lower for word in ['delete', 'remove']) and any(word in text_lower for word in ['folder', 'directory']):
+            operation = "remove_directory"
+            parameters = {
+                "operation": "remove_directory",
+                "path": file_path,
+                "force": True
+            }
+            if not file_path:
+                # Ask for directory name
+                self.speak_response("Which folder would you like to delete?")
+                return
+        
+        # File existence check
+        elif any(word in text_lower for word in ['exist', 'there', 'check']):
+            operation = "exists"
+            parameters = {
+                "operation": "exists",
+                "path": file_path
+            }
+            if not file_path:
+                # Ask for file name
+                self.speak_response("Which file would you like to check?")
+                return
+        
+        # File info
+        elif any(word in text_lower for word in ['info', 'details', 'about', 'tell', 'show']):
+            operation = "get_info"
+            parameters = {
+                "operation": "get_info",
+                "path": file_path
+            }
+            if not file_path:
+                # Ask for file name
+                self.speak_response("Which file would you like information about?")
+                return
+        
+        # General file operations
+        else:
+            operation = "file_operation"
+            parameters = {
+                "operation": "general",
+                "path": file_path or "current directory"
+            }
+        
+        if operation:
+            print(f"File operation: {operation} with parameters: {parameters}")
+            # Emit the signal to trigger file operation
+            self.file_operation_requested.emit(operation, parameters)
+            print("Signal emitted for file operation")
+        else:
+            print("Could not determine file operation type")
+            self.speak_response("I'm not sure what file operation you want to perform. Please be more specific.")
 
 
 class VoiceCommandProcessor:
@@ -713,6 +1133,10 @@ class VoiceCommandProcessor:
     def set_home_status_callback(self, callback: Callable):
         """Set the callback for home status requests."""
         self.handler.set_home_status_callback(callback)
+    
+    def set_file_operation_callback(self, callback: Callable):
+        """Set the callback for file operation requests."""
+        self.handler.set_file_operation_callback(callback)
     
     def _background_listening_loop(self):
         """Background listening loop for wake words."""
