@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     
     # Agent Configuration
     agent_name: str = "Aras"
+    owner_name: str = Field(default="Awul", env="OWNER_NAME")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     
     # Server Configuration

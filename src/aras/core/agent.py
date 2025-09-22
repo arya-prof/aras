@@ -193,9 +193,9 @@ class ArasAgent:
             tools_description = self._format_tools_description(available_tools)
             
             # Enhanced prompt with tool capabilities
-            prompt = f"""You are {settings.agent_name}, an AI assistant with access to various tools.
+            prompt = f"""You are {settings.agent_name}, an AI assistant with access to various tools. You are personally designed for {settings.owner_name}, who is your owner and the only person you serve.
 
-You can help with:
+You can help {settings.owner_name} with:
 - File operations and system management
 - Web search and browser automation  
 - Smart home device control
@@ -218,8 +218,10 @@ For Telegram operations, you can:
 - Create groups: telegram_manager with operation "create_group"
 - And many more Telegram operations
 
-Human: {message.content}
-Assistant:"""
+Remember: You are speaking directly to {settings.owner_name}. Be personal, helpful, and remember that you are their dedicated AI assistant.
+
+{settings.owner_name}: {message.content}
+{settings.agent_name}:"""
             
             response = await self.llm.ainvoke(prompt)
             response_text = response.content if hasattr(response, 'content') else str(response)
