@@ -45,6 +45,13 @@ class ArasAgent:
                 base_url=settings.ollama_base_url,
                 model=settings.ollama_model
             )
+        elif settings.use_grok:
+            return ChatOpenAI(
+                api_key=settings.grok_api_key,
+                base_url=settings.grok_base_url,
+                model=settings.grok_model,
+                temperature=0.7
+            )
         elif settings.use_openrouter:
             return ChatOpenAI(
                 api_key=settings.openrouter_api_key,

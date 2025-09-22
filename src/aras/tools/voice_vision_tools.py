@@ -47,7 +47,10 @@ class SpeechProcessingTool(AsyncTool):
             raise ValueError("audio_file is required")
         
         # Check for API key and configure client
-        if settings.use_openrouter and settings.openrouter_api_key:
+        if settings.use_grok and settings.grok_api_key:
+            openai.api_key = settings.grok_api_key
+            openai.api_base = settings.grok_base_url
+        elif settings.use_openrouter and settings.openrouter_api_key:
             openai.api_key = settings.openrouter_api_key
             openai.api_base = settings.openrouter_base_url
         elif settings.openai_api_key:
@@ -80,7 +83,10 @@ class SpeechProcessingTool(AsyncTool):
             raise ValueError("text is required")
         
         # Check for API key and configure client
-        if settings.use_openrouter and settings.openrouter_api_key:
+        if settings.use_grok and settings.grok_api_key:
+            openai.api_key = settings.grok_api_key
+            openai.api_base = settings.grok_base_url
+        elif settings.use_openrouter and settings.openrouter_api_key:
             openai.api_key = settings.openrouter_api_key
             openai.api_base = settings.openrouter_base_url
         elif settings.openai_api_key:

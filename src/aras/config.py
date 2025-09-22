@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1", env="OPENROUTER_BASE_URL")
     use_openrouter: bool = Field(default=False, env="USE_OPENROUTER")
     
+    # Grok Configuration (via OpenRouter)
+    grok_api_key: Optional[str] = Field(default=None, env="GROK_API_KEY")
+    grok_base_url: str = Field(default="https://openrouter.ai/api/v1", env="GROK_BASE_URL")
+    grok_model: str = Field(default="openai/x-ai/grok-4-fast:free", env="GROK_MODEL")
+    use_grok: bool = Field(default=False, env="USE_GROK")
+    
     # Home Assistant
     ha_base_url: Optional[str] = Field(default=None, env="HA_BASE_URL")
     ha_token: Optional[str] = Field(default=None, env="HA_TOKEN")

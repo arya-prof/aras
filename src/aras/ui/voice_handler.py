@@ -36,15 +36,31 @@ class VoiceCommandHandler(QObject):
         self.openai_client = None
         self.tts_engine = None
         
-        # Initialize LLM client (supports OpenAI, OpenRouter, and Ollama)
+        # Initialize LLM client (supports OpenAI, OpenRouter, Grok, and Ollama)
         self.llm_client = None
+        print(f"[DEBUG-INIT] Settings: use_ollama={settings.use_ollama}, use_grok={settings.use_grok}, use_openrouter={settings.use_openrouter}")
+        print(f"[DEBUG-INIT] API Keys: grok={bool(settings.grok_api_key)}, openrouter={bool(settings.openrouter_api_key)}, openai={bool(settings.openai_api_key)}")
+        
         if settings.use_ollama:
+            print("[DEBUG-INIT] Initializing Ollama LLM client")
             from langchain_community.llms import Ollama
             self.llm_client = Ollama(
                 base_url=settings.ollama_base_url,
                 model=settings.ollama_model
             )
+            print(f"[DEBUG-INIT] Ollama client created: {self.llm_client}")
+        elif settings.use_grok and settings.grok_api_key:
+            print("[DEBUG-INIT] Initializing Grok LLM client")
+            from langchain_openai import ChatOpenAI
+            self.llm_client = ChatOpenAI(
+                api_key=settings.grok_api_key,
+                base_url=settings.grok_base_url,
+                model=settings.grok_model,
+                temperature=0.7
+            )
+            print(f"[DEBUG-INIT] Grok client created: {self.llm_client}")
         elif settings.use_openrouter and settings.openrouter_api_key:
+            print("[DEBUG-INIT] Initializing OpenRouter LLM client")
             from langchain_openai import ChatOpenAI
             self.llm_client = ChatOpenAI(
                 api_key=settings.openrouter_api_key,
@@ -52,16 +68,25 @@ class VoiceCommandHandler(QObject):
                 model=settings.openai_model,
                 temperature=0.7
             )
+            print(f"[DEBUG-INIT] OpenRouter client created: {self.llm_client}")
         elif settings.openai_api_key:
+            print("[DEBUG-INIT] Initializing OpenAI LLM client")
             from langchain_openai import ChatOpenAI
             self.llm_client = ChatOpenAI(
                 api_key=settings.openai_api_key,
                 model=settings.openai_model,
                 temperature=0.7
             )
+            print(f"[DEBUG-INIT] OpenAI client created: {self.llm_client}")
+        else:
+            print("[DEBUG-INIT] No LLM client configured")
         
         # Keep the old openai client for TTS/STT
-        if settings.use_openrouter and settings.openrouter_api_key:
+        if settings.use_grok and settings.grok_api_key:
+            openai.api_key = settings.grok_api_key
+            openai.api_base = settings.grok_base_url
+            self.openai_client = openai
+        elif settings.use_openrouter and settings.openrouter_api_key:
             openai.api_key = settings.openrouter_api_key
             openai.api_base = settings.openrouter_base_url
             self.openai_client = openai
@@ -167,6 +192,18 @@ class VoiceCommandHandler(QObject):
     def _process_with_llm(self, command: str) -> Dict[str, Any]:
         """Process command using LLM for natural language understanding."""
         try:
+            print(f"[DEBUG-LLM] Starting LLM processing for: '{command}'")
+            print(f"[DEBUG-LLM] LLM client type: {type(self.llm_client)}")
+            print(f"[DEBUG-LLM] LLM client available: {self.llm_client is not None}")
+            
+            if not self.llm_client:
+                print("[DEBUG-LLM] ERROR: No LLM client available")
+                return {
+                    'success': False,
+                    'error': 'No LLM client available',
+                    'response': 'Sorry, AI processing is not available.'
+                }
+            
             system_prompt = """You are Aras, an AI agent assistant. You can help with various tasks and control systems.
 
 Available capabilities:
@@ -195,8 +232,13 @@ Current context: The user is interacting with the Aras AI agent via voice comman
                 HumanMessage(content=command)
             ]
             
+            print(f"[DEBUG-LLM] Sending messages to LLM: {len(messages)} messages")
             response = self.llm_client.invoke(messages)
+            print(f"[DEBUG-LLM] Received response type: {type(response)}")
+            print(f"[DEBUG-LLM] Response content: {response}")
+            
             chat_response = response.content if hasattr(response, 'content') else str(response)
+            print(f"[DEBUG-LLM] Extracted response: {chat_response}")
             
             # Extract actionable commands
             action_result = self._extract_and_execute_actions(command, chat_response)
@@ -209,6 +251,10 @@ Current context: The user is interacting with the Aras AI agent via voice comman
             }
             
         except Exception as e:
+            print(f"[DEBUG-LLM] ERROR: Exception in LLM processing: {e}")
+            print(f"[DEBUG-LLM] ERROR: Exception type: {type(e)}")
+            import traceback
+            print(f"[DEBUG-LLM] ERROR: Traceback: {traceback.format_exc()}")
             return {
                 'success': False,
                 'error': str(e),
