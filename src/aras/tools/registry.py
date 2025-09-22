@@ -7,6 +7,7 @@ from .system_tools import FileOperationsTool, ProcessManagementTool, SystemContr
 from .web_tools import WebSearchTool, BrowserAutomationTool, APITool
 from .home_tools import DeviceControlTool, SceneManagementTool, ClimateControlTool
 from .communication_tools import EmailTool, NotificationTool
+from .telegram_tools import TelegramTool
 from .knowledge_tools import MemoryOperationsTool, VectorSearchTool
 from .voice_vision_tools import SpeechProcessingTool, ImageProcessingTool, CameraControlTool
 from .safety_tools import PermissionCheckTool, AccessControlTool, AuditLoggingTool
@@ -34,6 +35,7 @@ def create_tool_registry() -> ToolRegistry:
     # Communication tools
     registry.register_tool(EmailTool())
     registry.register_tool(NotificationTool())
+    registry.register_tool(TelegramTool())
     
     # Knowledge tools
     registry.register_tool(MemoryOperationsTool())

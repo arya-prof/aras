@@ -46,11 +46,17 @@ class SpeechProcessingTool(AsyncTool):
         if not audio_file:
             raise ValueError("audio_file is required")
         
-        if not settings.openai_api_key:
-            raise RuntimeError("OpenAI API key not configured")
+        # Check for API key and configure client
+        if settings.use_openrouter and settings.openrouter_api_key:
+            openai.api_key = settings.openrouter_api_key
+            openai.api_base = settings.openrouter_base_url
+        elif settings.openai_api_key:
+            openai.api_key = settings.openai_api_key
+        else:
+            raise RuntimeError("No API key configured for speech processing")
         
         try:
-            # Use OpenAI Whisper API
+            # Use OpenAI Whisper API (works with both OpenAI and OpenRouter)
             with open(audio_file, "rb") as audio_file_obj:
                 transcript = openai.Audio.transcribe(
                     model=settings.whisper_model,
@@ -73,14 +79,20 @@ class SpeechProcessingTool(AsyncTool):
         if not text:
             raise ValueError("text is required")
         
-        if not settings.openai_api_key:
-            raise RuntimeError("OpenAI API key not configured")
+        # Check for API key and configure client
+        if settings.use_openrouter and settings.openrouter_api_key:
+            openai.api_key = settings.openrouter_api_key
+            openai.api_base = settings.openrouter_base_url
+        elif settings.openai_api_key:
+            openai.api_key = settings.openai_api_key
+        else:
+            raise RuntimeError("No API key configured for speech processing")
         
         if not output_file:
             output_file = f"tts_output_{hash(text)}.mp3"
         
         try:
-            # Use OpenAI TTS API
+            # Use OpenAI TTS API (works with both OpenAI and OpenRouter)
             response = openai.audio.speech.create(
                 model=settings.tts_model,
                 voice=voice,

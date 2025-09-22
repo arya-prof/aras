@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     ollama_model: str = Field(default="llama2", env="OLLAMA_MODEL")
     use_ollama: bool = Field(default=False, env="USE_OLLAMA")
     
+    # OpenRouter Configuration
+    openrouter_api_key: Optional[str] = Field(default=None, env="OPENROUTER_API_KEY")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1", env="OPENROUTER_BASE_URL")
+    use_openrouter: bool = Field(default=False, env="USE_OPENROUTER")
+    
     # Home Assistant
     ha_base_url: Optional[str] = Field(default=None, env="HA_BASE_URL")
     ha_token: Optional[str] = Field(default=None, env="HA_TOKEN")
@@ -52,6 +57,11 @@ class Settings(BaseSettings):
     twilio_account_sid: Optional[str] = Field(default=None, env="TWILIO_ACCOUNT_SID")
     twilio_auth_token: Optional[str] = Field(default=None, env="TWILIO_AUTH_TOKEN")
     twilio_phone_number: Optional[str] = Field(default=None, env="TWILIO_PHONE_NUMBER")
+    
+    # Telegram Configuration
+    telegram_api_id: Optional[str] = Field(default=None, env="TELEGRAM_API_ID")
+    telegram_api_hash: Optional[str] = Field(default=None, env="TELEGRAM_API_HASH")
+    telegram_phone: Optional[str] = Field(default=None, env="TELEGRAM_PHONE")
     
     # UI Configuration
     ui_theme: str = Field(default="dark", env="UI_THEME")

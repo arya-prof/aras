@@ -36,8 +36,36 @@ class VoiceCommandHandler(QObject):
         self.openai_client = None
         self.tts_engine = None
         
-        # Initialize OpenAI client
-        if settings.openai_api_key:
+        # Initialize LLM client (supports OpenAI, OpenRouter, and Ollama)
+        self.llm_client = None
+        if settings.use_ollama:
+            from langchain_community.llms import Ollama
+            self.llm_client = Ollama(
+                base_url=settings.ollama_base_url,
+                model=settings.ollama_model
+            )
+        elif settings.use_openrouter and settings.openrouter_api_key:
+            from langchain_openai import ChatOpenAI
+            self.llm_client = ChatOpenAI(
+                api_key=settings.openrouter_api_key,
+                base_url=settings.openrouter_base_url,
+                model=settings.openai_model,
+                temperature=0.7
+            )
+        elif settings.openai_api_key:
+            from langchain_openai import ChatOpenAI
+            self.llm_client = ChatOpenAI(
+                api_key=settings.openai_api_key,
+                model=settings.openai_model,
+                temperature=0.7
+            )
+        
+        # Keep the old openai client for TTS/STT
+        if settings.use_openrouter and settings.openrouter_api_key:
+            openai.api_key = settings.openrouter_api_key
+            openai.api_base = settings.openrouter_base_url
+            self.openai_client = openai
+        elif settings.openai_api_key:
             openai.api_key = settings.openai_api_key
             self.openai_client = openai
         
@@ -104,22 +132,22 @@ class VoiceCommandHandler(QObject):
         
         print(f"[DEBUG-{command_id}] VOICE_INPUT: You: {text}")
         
-        # Try GPT-4 processing first if available
-        if self.openai_client:
+        # Try LLM processing first if available
+        if self.llm_client:
             try:
-                print(f"[DEBUG-{command_id}] GPT4_PROCESSING: Starting GPT-4 processing")
-                result = self._process_with_gpt4(text)
+                print(f"[DEBUG-{command_id}] LLM_PROCESSING: Starting LLM processing")
+                result = self._process_with_llm(text)
                 if result['success']:
                     print(f"[DEBUG-{command_id}] COMMAND_PROCESSED: '{text}' -> {result}")
                     self.command_processed.emit(text, result)
                     
                     # UI will handle response and TTS from command_processed signal
-                    print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: GPT-4 processing successful")
+                    print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: LLM processing successful")
                     return True
                 else:
-                    print(f"[DEBUG-{command_id}] GPT4_FAILED: GPT-4 processing failed, trying pattern matching")
+                    print(f"[DEBUG-{command_id}] LLM_FAILED: LLM processing failed, trying pattern matching")
             except Exception as e:
-                print(f"[DEBUG-{command_id}] ERROR: GPT-4 processing failed: {e}")
+                print(f"[DEBUG-{command_id}] ERROR: LLM processing failed: {e}")
         
         # Fallback to pattern matching
         print(f"[DEBUG-{command_id}] PATTERN_MATCHING: Starting pattern matching")
@@ -136,8 +164,8 @@ class VoiceCommandHandler(QObject):
         print(f"[DEBUG-{command_id}] PROCESSING_FAILED: Command not recognized")
         return False
     
-    def _process_with_gpt4(self, command: str) -> Dict[str, Any]:
-        """Process command using GPT-4 for natural language understanding."""
+    def _process_with_llm(self, command: str) -> Dict[str, Any]:
+        """Process command using LLM for natural language understanding."""
         try:
             system_prompt = """You are Aras, an AI agent assistant. You can help with various tasks and control systems.
 
@@ -160,17 +188,15 @@ When responding:
 
 Current context: The user is interacting with the Aras AI agent via voice commands."""
 
-            response = self.openai_client.chat.completions.create(
-                model=settings.openai_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": command}
-                ],
-                max_tokens=300,
-                temperature=0.7
-            )
+            # Use LangChain LLM client
+            from langchain.schema import HumanMessage, SystemMessage
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=command)
+            ]
             
-            chat_response = response.choices[0].message.content.strip()
+            response = self.llm_client.invoke(messages)
+            chat_response = response.content if hasattr(response, 'content') else str(response)
             
             # Extract actionable commands
             action_result = self._extract_and_execute_actions(command, chat_response)
