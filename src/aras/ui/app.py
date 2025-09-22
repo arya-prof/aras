@@ -42,5 +42,63 @@ class ArasApp(QApplication):
 
 def run_headless():
     """Run the headless UI with circular indicator."""
-    app = ArasApp(sys.argv)
-    return app.exec()
+    # Check for existing instance to prevent multiple instances
+    import os
+    import tempfile
+    import sys
+    
+    lock_file_path = os.path.join(tempfile.gettempdir(), "aras_agent.lock")
+    
+    # Check if lock file exists and if the process is still running
+    if os.path.exists(lock_file_path):
+        try:
+            with open(lock_file_path, 'r') as f:
+                pid = int(f.read().strip())
+            
+            # Check if process is still running
+            if sys.platform == "win32":
+                import psutil
+                if psutil.pid_exists(pid):
+                    print("Error: ARAS Agent is already running!")
+                    print("Only one instance of ARAS Agent can run at a time.")
+                    print("Please close the existing instance or restart your system.")
+                    return 1
+            else:
+                # Unix-like systems
+                try:
+                    os.kill(pid, 0)  # Check if process exists
+                    print("Error: ARAS Agent is already running!")
+                    print("Only one instance of ARAS Agent can run at a time.")
+                    print("Please close the existing instance or restart your system.")
+                    return 1
+                except OSError:
+                    # Process doesn't exist, remove stale lock file
+                    os.unlink(lock_file_path)
+        except (ValueError, FileNotFoundError):
+            # Invalid lock file, remove it
+            try:
+                os.unlink(lock_file_path)
+            except:
+                pass
+    
+    # Create lock file
+    try:
+        with open(lock_file_path, 'w') as f:
+            f.write(str(os.getpid()))
+        
+        print("Starting ARAS Agent - Single instance check passed")
+        
+        app = ArasApp(sys.argv)
+        result = app.exec()
+        
+        # Clean up lock file
+        try:
+            os.unlink(lock_file_path)
+        except:
+            pass
+            
+        return result
+        
+    except Exception as e:
+        print(f"Error: Failed to start ARAS Agent: {e}")
+        return 1

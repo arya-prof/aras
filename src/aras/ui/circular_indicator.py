@@ -394,13 +394,27 @@ class HeadlessAgentWindow(QWidget):
         
         # Handle response immediately to avoid duplication with voice_response signal
         if result.get('response'):
+            # Check for duplicate response within the last 3 seconds
+            current_time = time.time()
+            response_text = result['response']
+            
+            if hasattr(self, '_last_response_time') and hasattr(self, '_last_response_text'):
+                if (current_time - self._last_response_time < 3.0 and 
+                    self._last_response_text == response_text):
+                    print(f"[DEBUG-UI-{timestamp}] DUPLICATE_RESPONSE_IGNORED: Ignoring duplicate response within 3 seconds")
+                    return
+            
+            # Update last response tracking
+            self._last_response_time = current_time
+            self._last_response_text = response_text
+            
             print(f"[DEBUG-UI-{timestamp}] IMMEDIATE_RESPONSE: Handling response from command_processed")
-            self.indicator.set_last_response(result['response'])
+            self.indicator.set_last_response(response_text)
             
             # Handle TTS
             if hasattr(self, 'voice_processor') and hasattr(self.voice_processor, 'handler'):
                 print(f"[DEBUG-UI-{timestamp}] TTS_HANDLING: Speaking response via command_processed")
-                self.voice_processor.handler.speak_response(result['response'])
+                self.voice_processor.handler.speak_response(response_text)
     
     def on_voice_response(self, response: str):
         """Handle voice response signal - DISABLED to avoid duplication."""

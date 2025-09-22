@@ -155,6 +155,18 @@ class VoiceCommandHandler(QObject):
         
         text = text.strip()
         
+        # Check for duplicate processing within the last 2 seconds
+        current_time = time.time()
+        if hasattr(self, '_last_command_time') and hasattr(self, '_last_command_text'):
+            if (current_time - self._last_command_time < 2.0 and 
+                self._last_command_text.lower() == text.lower()):
+                print(f"[DEBUG-{command_id}] DUPLICATE_IGNORED: Ignoring duplicate command within 2 seconds")
+                return True  # Return True to indicate it was "handled" (ignored)
+        
+        # Update last command tracking
+        self._last_command_time = current_time
+        self._last_command_text = text
+        
         print(f"[DEBUG-{command_id}] VOICE_INPUT: You: {text}")
         
         # Try LLM processing first if available
