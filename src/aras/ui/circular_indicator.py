@@ -10,206 +10,186 @@ from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QRadialGradient, QFont
 from PyQt6.QtCore import QRect
 
 from .voice_handler import VoiceCommandProcessor
+from .qt_visualizer import QtVisualizer
 
 
 class CircularIndicator(QWidget):
-    """A circular indicator widget that shows agent status with glowing effect."""
+    """Wrapper for the new QtVisualizer that maintains compatibility with existing code."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(120, 120)
+        # Size to accommodate the full 700x700 visualizer
+        self.setFixedSize(700, 700)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
-        # Status properties
+        # Create the new visualizer with original size
+        self.visualizer = QtVisualizer(self)
+        self.visualizer.setFixedSize(700, 700)  # Original size from your script
+        self.visualizer.move(0, 0)  # Position at origin
+        
+        # Status properties for compatibility
         self._is_active = False
         self._voice_listening = False
         self._voice_processing = False
         self._voice_responding = False
-        self._pulse_animation = None
-        self._pulse_radius = 0
-        self._opacity = 1.0
         self._last_command = ""
         self._last_response = ""
         
+        # State transition timer for smooth transitions
+        self._state_timer = QTimer()
+        self._state_timer.timeout.connect(self._update_visualizer_state)
+        self._state_timer.start(200)  # Update every 200ms for more responsive but stable updates
         
-        # Colors
-        self.active_color = QColor(0, 255, 100)  # Green when active
-        self.inactive_color = QColor(100, 100, 100)  # Gray when inactive
-        self.voice_color = QColor(0, 150, 255)  # Blue when listening
-        self.processing_color = QColor(255, 165, 0)  # Orange when processing
-        self.responding_color = QColor(138, 43, 226)  # Purple when speaking
-        self.glow_color = QColor(0, 255, 100, 50)  # Glow effect
+        # Track current visualizer state to prevent unnecessary updates
+        self._current_visualizer_state = "inactive"
         
-        # Setup pulse animation
-        self.setup_animation()
+        # State change debouncing
+        self._last_state_change_time = 0
+        self._min_state_change_interval = 0.3  # Minimum 300ms between state changes
+        
+        # State transition queue for handling rapid changes
+        self._pending_state = None
+        self._state_transition_timer = QTimer()
+        self._state_transition_timer.timeout.connect(self._process_pending_state)
+        self._state_transition_timer.setSingleShot(True)
         
         # Start with inactive state
         self.set_active(False)
     
-    def setup_animation(self):
-        """Setup the pulse animation."""
-        self._pulse_animation = QPropertyAnimation(self, b"pulse_radius")
-        self._pulse_animation.setDuration(2000)
-        self._pulse_animation.setLoopCount(-1)  # Infinite loop
-        self._pulse_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
-        self._pulse_animation.setStartValue(0)
-        self._pulse_animation.setEndValue(60)
+    def _update_visualizer_state(self):
+        """Update the visualizer state based on current status."""
+        try:
+            import time
+            current_time = time.time()
+            
+            # Determine target state based on priority order: responding > processing > listening > active > inactive
+            target_state = "inactive"
+            if self._voice_responding:
+                target_state = "responding"
+            elif self._voice_processing:
+                target_state = "processing"
+            elif self._voice_listening:
+                target_state = "voice"
+            elif self._is_active:
+                target_state = "active"
+            
+            # Only update if state has changed
+            if target_state != self._current_visualizer_state:
+                # Check if we need to debounce this change
+                if current_time - self._last_state_change_time < self._min_state_change_interval:
+                    # Store pending state and set a timer
+                    self._pending_state = target_state
+                    if not self._state_transition_timer.isActive():
+                        self._state_transition_timer.start(int(self._min_state_change_interval * 1000))
+                    return
+                
+                # Additional safety check for rapid responding/listening changes
+                if (self._current_visualizer_state == "responding" and target_state == "voice") or \
+                   (self._current_visualizer_state == "voice" and target_state == "responding"):
+                    # Add extra delay for these rapid transitions
+                    if current_time - self._last_state_change_time < 0.5:  # 500ms minimum
+                        self._pending_state = target_state
+                        if not self._state_transition_timer.isActive():
+                            self._state_transition_timer.start(500)  # 500ms delay
+                        return
+                
+                self.visualizer.set_state(target_state)
+                self._current_visualizer_state = target_state
+                self._last_state_change_time = current_time
+                self._pending_state = None
+                
+        except Exception as e:
+            print(f"Error updating visualizer state: {e}")
     
-    @pyqtProperty(int)
-    def pulse_radius(self):
-        return self._pulse_radius
-    
-    @pulse_radius.setter
-    def pulse_radius(self, value):
-        self._pulse_radius = value
-        self.update()
+    def _process_pending_state(self):
+        """Process any pending state change after debounce delay."""
+        if self._pending_state:
+            try:
+                import time
+                self.visualizer.set_state(self._pending_state)
+                self._current_visualizer_state = self._pending_state
+                self._last_state_change_time = time.time()
+                self._pending_state = None
+            except Exception as e:
+                print(f"Error processing pending state: {e}")
     
     def set_active(self, active: bool):
         """Set the active state of the indicator."""
         self._is_active = active
-        if active:
-            self._pulse_animation.start()
-            self._opacity = 1.0
-        else:
-            self._pulse_animation.stop()
-            self._opacity = 0.6
-        self.update()
+        # State will be updated by the timer
     
     def set_voice_listening(self, listening: bool):
         """Set the voice listening state of the indicator."""
         self._voice_listening = listening
-        self.update()
+        # State will be updated by the timer
     
     def set_voice_processing(self, processing: bool):
         """Set voice processing status."""
         self._voice_processing = processing
-        self.update()
+        # State will be updated by the timer
     
     def set_voice_responding(self, responding: bool):
         """Set voice responding status."""
         self._voice_responding = responding
-        self.update()
+        # State will be updated by the timer
     
     def set_last_command(self, command: str):
         """Set the last voice command."""
         self._last_command = command
-        self.update()
+        # Trigger a brief glow effect for command received
+        if command:
+            try:
+                self.visualizer.set_glow_mode(True)
+                # Reset glow after 1 second
+                QTimer.singleShot(1000, lambda: self._reset_glow())
+            except Exception as e:
+                print(f"Error setting glow for command: {e}")
     
     def set_last_response(self, response: str):
         """Set the last voice response."""
         self._last_response = response
-        self.update()
+        # Trigger a brief glow effect for response generated
+        if response:
+            try:
+                self.visualizer.set_glow_mode(True)
+                # Reset glow after 1 second
+                QTimer.singleShot(1000, lambda: self._reset_glow())
+            except Exception as e:
+                print(f"Error setting glow for response: {e}")
+    
+    def _reset_glow(self):
+        """Reset glow mode safely."""
+        try:
+            # Let the state management system handle the transition back
+            # Don't force it back to "active" - let the timer handle it
+            pass
+        except Exception as e:
+            print(f"Error resetting glow: {e}")
     
     def is_active(self) -> bool:
         """Get the active state."""
         return self._is_active
     
     def paintEvent(self, event):
-        """Paint the circular indicator."""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Get widget dimensions
-        rect = self.rect()
-        center = rect.center()
-        radius = min(rect.width(), rect.height()) // 2 - 5
-        
-        # Set opacity
-        painter.setOpacity(self._opacity)
-        
-        # Choose color based on status
-        if self._voice_responding:
-            # Purple when speaking
-            main_color = self.responding_color
-            glow_color = QColor(138, 43, 226, 80)
-        elif self._voice_processing:
-            # Orange when processing voice
-            main_color = self.processing_color
-            glow_color = QColor(255, 165, 0, 80)
-        elif self._voice_listening:
-            # Blue when listening
-            main_color = self.voice_color
-            glow_color = QColor(0, 150, 255, 80)
-        elif self._is_active:
-            # Green when active
-            main_color = self.active_color
-            glow_color = QColor(0, 255, 100, 80)
-        else:
-            # Gray when inactive
-            main_color = self.inactive_color
-            glow_color = QColor(100, 100, 100, 0)
-        
-        if self._is_active or self._voice_listening or self._voice_responding:
-            # Draw glow effect
-            if self._pulse_radius > 0:
-                glow_rect = QRect(
-                    center.x() - radius - self._pulse_radius,
-                    center.y() - radius - self._pulse_radius,
-                    (radius + self._pulse_radius) * 2,
-                    (radius + self._pulse_radius) * 2
-                )
-                
-                gradient = QRadialGradient(center.x(), center.y(), radius + self._pulse_radius)
-                gradient.setColorAt(0, glow_color)
-                gradient.setColorAt(0.7, QColor(glow_color.red(), glow_color.green(), glow_color.blue(), 20))
-                gradient.setColorAt(1, QColor(glow_color.red(), glow_color.green(), glow_color.blue(), 0))
-                
-                painter.setBrush(QBrush(gradient))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawEllipse(glow_rect)
-            
-            # Draw main circle
-            painter.setBrush(QBrush(main_color))
-            painter.setPen(QPen(main_color.darker(150), 2))
-            painter.drawEllipse(center.x() - radius, center.y() - radius, radius * 2, radius * 2)
-            
-            # Draw inner indicator
-            inner_radius = radius // 3
-            if self._voice_listening:
-                # Draw microphone icon (simple representation)
-                painter.setBrush(QBrush(QColor(255, 255, 255)))
-                painter.setPen(QPen(QColor(255, 255, 255), 2))
-                # Draw a simple microphone shape
-                mic_rect = QRect(center.x() - inner_radius//2, center.y() - inner_radius, inner_radius, inner_radius)
-                painter.drawRect(mic_rect)
-                # Draw microphone stand
-                painter.drawLine(center.x(), center.y() + inner_radius//2, center.x(), center.y() + inner_radius)
-            else:
-                # Draw inner dot
-                painter.setBrush(QBrush(QColor(255, 255, 255)))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawEllipse(center.x() - inner_radius, center.y() - inner_radius, 
-                                  inner_radius * 2, inner_radius * 2)
-        else:
-            # Draw inactive circle
-            painter.setBrush(QBrush(main_color))
-            painter.setPen(QPen(main_color.darker(150), 2))
-            painter.drawEllipse(center.x() - radius, center.y() - radius, radius * 2, radius * 2)
-            
-            # Draw "A" for Agent
-            painter.setPen(QPen(QColor(255, 255, 255), 3))
-            font = QFont("Arial", 24, QFont.Weight.Bold)
-            painter.setFont(font)
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "A")
+        """Override paintEvent to let the visualizer handle all drawing."""
+        # Don't draw anything here - let the visualizer handle all the drawing
+        pass
     
     def mousePressEvent(self, event):
         """Handle mouse press events - pass to parent window for dragging."""
-        # Pass mouse events to parent window for dragging
         if self.parent():
             self.parent().mousePressEvent(event)
         super().mousePressEvent(event)
     
     def mouseMoveEvent(self, event):
         """Handle mouse move events - pass to parent window for dragging."""
-        # Pass mouse events to parent window for dragging
         if self.parent():
             self.parent().mouseMoveEvent(event)
         super().mouseMoveEvent(event)
     
     def mouseReleaseEvent(self, event):
         """Handle mouse release events - pass to parent window for dragging."""
-        # Pass mouse events to parent window for dragging
         if self.parent():
             self.parent().mouseReleaseEvent(event)
         super().mouseReleaseEvent(event)
@@ -233,7 +213,7 @@ class HeadlessAgentWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Aras Agent")
-        self.setFixedSize(120, 150)  # Increased height to accommodate status text
+        self.setFixedSize(700, 730)  # Size to accommodate full 700x700 visualizer and status text
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
@@ -334,61 +314,31 @@ class HeadlessAgentWindow(QWidget):
         self.update_status_text()
     
     def update_status_text(self):
-        """Update the status text based on current state."""
-        # Priority order: Speaking > Thinking > Listening > Ready > Idle
-        if self.voice_responding:
-            # When speaking, ignore other states to prevent mixing
-            self.status_label.setText("Speaking")
-            self.status_label.setStyleSheet("""
-                QLabel {
-                    color: #8A2BE2;
-                    background-color: transparent;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-            """)
-        elif self.voice_processing:
-            # When processing, ignore listening state
-            self.status_label.setText("Thinking")
-            self.status_label.setStyleSheet("""
-                QLabel {
-                    color: #FFA500;
-                    background-color: transparent;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-            """)
-        elif self.voice_listening and not self.voice_responding:
-            # Only show listening if not speaking
-            self.status_label.setText("Listening")
-            self.status_label.setStyleSheet("""
-                QLabel {
-                    color: #0096FF;
-                    background-color: transparent;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-            """)
-        elif self.agent_active:
-            self.status_label.setText("Ready")
-            self.status_label.setStyleSheet("""
-                QLabel {
-                    color: #00FF64;
-                    background-color: transparent;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-            """)
-        else:
-            self.status_label.setText("Idle")
-            self.status_label.setStyleSheet("""
-                QLabel {
-                    color: #808080;
-                    background-color: transparent;
-                    font-size: 10px;
-                    font-weight: bold;
-                }
-            """)
+         """Update the status text based on current state."""
+         # Priority order: Speaking > Thinking > Listening > Ready > Idle
+         if self.voice_responding:
+             # When speaking, ignore other states to prevent mixing
+             self.status_label.setText("Speaking")
+         elif self.voice_processing:
+             # When processing, ignore listening state
+             self.status_label.setText("Thinking")
+         elif self.voice_listening and not self.voice_responding:
+             # Only show listening if not speaking
+             self.status_label.setText("Listening")
+         elif self.agent_active:
+             self.status_label.setText("Ready")
+         else:
+             self.status_label.setText("Idle")
+         
+         # Always use white text
+         self.status_label.setStyleSheet("""
+             QLabel {
+                 color: white;
+                 background-color: transparent;
+                 font-size: 10px;
+                 font-weight: bold;
+             }
+         """)
     
     def on_command_processed(self, command: str, result: dict):
         """Handle command processed signal."""
@@ -477,6 +427,7 @@ class HeadlessAgentWindow(QWidget):
         """Execute file operation using the agent's tools."""
         try:
             # Import here to avoid circular imports
+            import time
             from ..core.agent import ArasAgent
             from ..models import UserInput, MessageType
             
