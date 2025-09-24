@@ -17,6 +17,7 @@ from langchain_community.llms import Ollama
 from ..config import settings
 from ..models import AgentState, Message, MessageType, ToolCall, ToolResult, UserInput
 from ..tools.registry import create_tool_registry
+from aras.prompts import prompt_manager
 from .state_manager import StateManager
 from .message_handler import MessageHandler
 
@@ -192,33 +193,11 @@ class ArasAgent:
             available_tools = self._get_available_tools()
             tools_description = self._format_tools_description(available_tools)
             
-            # Enhanced prompt with tool capabilities
-            prompt = f"""You are {settings.agent_name}, an AI assistant with access to various tools. You are personally designed for {settings.owner_name}, who is your owner and the only person you serve.
-
-You can help {settings.owner_name} with:
-- File operations and system management
-- Web search and browser automation  
-- Smart home device control
-- Communication (email, notifications, Telegram messaging)
-- Knowledge management and memory
-- Voice and image processing
-- Security and access control
-
-Available Tools:
-{tools_description}
-
-When you need to use a tool, respond with:
-TOOL_CALL: tool_name
-PARAMETERS: {{"param1": "value1", "param2": "value2"}}
-
-For Telegram operations, you can:
-- Send messages to chats: telegram_manager with operation "send_message"
-- Get chat information: telegram_manager with operation "get_chat_info"  
-- Search messages: telegram_manager with operation "search_messages"
-- Create groups: telegram_manager with operation "create_group"
-- And many more Telegram operations
-
-Remember: You are speaking directly to {settings.owner_name}. Be personal, helpful, and remember that you are their dedicated AI assistant.
+            # Use centralized prompt manager
+            prompt = prompt_manager.get_text_chat_prompt(tools_description)
+            
+            # Add the conversation context
+            prompt += f"""
 
 {settings.owner_name}: {message.content}
 {settings.agent_name}:"""

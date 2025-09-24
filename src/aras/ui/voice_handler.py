@@ -19,6 +19,8 @@ except ImportError:
     SPEECH_RECOGNITION_AVAILABLE = False
 
 from ..config import settings
+from aras.prompts import prompt_manager
+from aras.responses import response_manager
 
 
 class VoiceCommandHandler(QObject):
@@ -329,31 +331,11 @@ class VoiceCommandHandler(QObject):
                 return {
                     'success': False,
                     'error': 'No LLM client available',
-                    'response': 'Sorry, AI processing is not available.'
+                    'response': response_manager.get_error_response('ai_unavailable')
                 }
             
-            system_prompt = f"""You are Aras, an AI agent assistant personally designed for {settings.owner_name}. You are their dedicated AI assistant and serve only them.
-
-Available capabilities:
-- Home automation and device control
-- System monitoring and status
-- File operations and management
-- Web search and browsing
-- Communication (email, notifications)
-- Knowledge management and memory
-- Image and voice processing
-- Camera control and recording
-- Raspberry Pi control and GPIO operations
-
-When responding:
-1. Be helpful and conversational, addressing {settings.owner_name} directly
-2. If you can perform an action, describe what you're doing
-3. If you need more information, ask for clarification
-4. Keep responses concise but informative
-5. Use natural language that sounds like a real assistant
-6. Remember you are speaking to {settings.owner_name}, your owner
-
-Current context: {settings.owner_name} is interacting with you via voice commands."""
+            # Use centralized prompt manager
+            system_prompt = prompt_manager.get_voice_prompt()
 
             # Use LangChain LLM client
             from langchain.schema import HumanMessage, SystemMessage
@@ -388,7 +370,7 @@ Current context: {settings.owner_name} is interacting with you via voice command
             return {
                 'success': False,
                 'error': str(e),
-                'response': 'Sorry, I encountered an error processing your command.'
+                'response': response_manager.get_error_response('command_error')
             }
     
     def _extract_and_execute_actions(self, command: str, chat_response: str) -> Dict[str, Any]:
@@ -936,7 +918,7 @@ $synth.Dispose()''')
             }
             if not file_path:
                 # Ask for file name
-                self.speak_response("What would you like to name the file?")
+                self.speak_response(response_manager.get_interactive_prompt('file_name_request'))
                 return
         
         # Directory creation
@@ -948,7 +930,7 @@ $synth.Dispose()''')
             }
             if not file_path:
                 # Ask for directory name
-                self.speak_response("What would you like to name the folder?")
+                self.speak_response(response_manager.get_interactive_prompt('folder_name_request'))
                 return
         
         # File deletion
@@ -960,7 +942,7 @@ $synth.Dispose()''')
             }
             if not file_path:
                 # Ask for file name
-                self.speak_response("Which file would you like to delete?")
+                self.speak_response(response_manager.get_interactive_prompt('file_delete_request'))
                 return
         
         # Directory deletion
@@ -973,7 +955,7 @@ $synth.Dispose()''')
             }
             if not file_path:
                 # Ask for directory name
-                self.speak_response("Which folder would you like to delete?")
+                self.speak_response(response_manager.get_interactive_prompt('folder_delete_request'))
                 return
         
         # File existence check
@@ -985,7 +967,7 @@ $synth.Dispose()''')
             }
             if not file_path:
                 # Ask for file name
-                self.speak_response("Which file would you like to check?")
+                self.speak_response(response_manager.get_interactive_prompt('file_check_request'))
                 return
         
         # File info
@@ -997,7 +979,7 @@ $synth.Dispose()''')
             }
             if not file_path:
                 # Ask for file name
-                self.speak_response("Which file would you like information about?")
+                self.speak_response(response_manager.get_interactive_prompt('file_info_request'))
                 return
         
         # General file operations
@@ -1015,7 +997,7 @@ $synth.Dispose()''')
             print("Signal emitted for file operation")
         else:
             print("Could not determine file operation type")
-            self.speak_response("I'm not sure what file operation you want to perform. Please be more specific.")
+            self.speak_response(response_manager.get_error_response('file_operation_unknown'))
 
 
 class VoiceCommandProcessor:
@@ -1097,12 +1079,12 @@ class VoiceCommandProcessor:
         self.voice_thread = threading.Thread(target=self._voice_listening_loop)
         self.voice_thread.daemon = True
         self.voice_thread.start()
-        print("Continuous voice listening started")
+        print(response_manager.get_status_message('voice_listening_started'))
     
     def pause_listening(self):
         """Pause voice listening temporarily."""
         self.is_listening = False
-        print("Voice listening paused")
+        print(response_manager.get_status_message('voice_listening_paused'))
     
     def is_actually_listening(self):
         """Check if we're actually listening (thread is alive and flag is true)."""
@@ -1115,7 +1097,7 @@ class VoiceCommandProcessor:
             # Give the thread a moment to finish its current iteration
             self.voice_thread.join(timeout=1)
             self.voice_thread = None
-            print("Voice thread stopped")
+            print(response_manager.get_status_message('voice_thread_stopped'))
     
     def resume_listening(self):
         """Resume voice listening."""
@@ -1131,7 +1113,7 @@ class VoiceCommandProcessor:
             self.voice_thread = threading.Thread(target=self._voice_listening_loop)
             self.voice_thread.daemon = True
             self.voice_thread.start()
-            print("Voice listening resumed")
+            print(response_manager.get_status_message('voice_listening_resumed'))
         else:
             print("Voice listening already active - skipping resume")
     
@@ -1150,7 +1132,7 @@ class VoiceCommandProcessor:
             self.background_thread.daemon = True
             self.background_thread.start()
             print("Background listening started - waiting for wake words...")
-            print("   Try: 'Hey Aras', 'Hi Aras', 'Hello', or 'Can you hear me'")
+            print(f"   {response_manager.get_help_message('wake_words')}")
     
     def stop_listening(self):
         """Stop listening for voice commands."""
@@ -1160,7 +1142,7 @@ class VoiceCommandProcessor:
         if self.voice_thread and self.voice_thread.is_alive():
             self.voice_thread.join(timeout=1)
             self.voice_thread = None
-            print("Voice listening stopped")
+            print(response_manager.get_status_message('voice_listening_stopped'))
     
     def stop_background_listening(self):
         """Stop background listening."""
@@ -1169,7 +1151,7 @@ class VoiceCommandProcessor:
         if self.background_thread and self.background_thread.is_alive():
             # Don't join the thread to avoid threading issues
             self.background_thread = None
-            print("Background listening stopped")
+            print(response_manager.get_status_message('background_listening_stopped'))
     
     def check_for_commands(self):
         """Check for voice commands (placeholder for actual voice recognition)."""
@@ -1204,7 +1186,7 @@ class VoiceCommandProcessor:
                         print("[DEBUG-VOICE] PROCESSING_SUCCESS: Voice command processed successfully!")
                     else:
                         print(f"[DEBUG-VOICE] PROCESSING_FAILED: Command not recognized: '{text}'")
-                        print("[DEBUG-VOICE] SUGGESTIONS: Try: 'home status', 'show system info', 'search for weather', 'send an email'")
+                        print(f"[DEBUG-VOICE] SUGGESTIONS: {response_manager.get_help_message('command_suggestions')}")
                         
                 except sr.UnknownValueError:
                     # Speech was unintelligible - this is normal
@@ -1324,7 +1306,7 @@ class VoiceCommandProcessor:
                         
                         # Provide feedback
                         if self.handler.tts_engine:
-                            self.handler.speak_response("Hello! I'm listening. How can I help you?")
+                            self.handler.speak_response(response_manager.get_wake_response('wake_word_detected'))
                         
                         break
                         
