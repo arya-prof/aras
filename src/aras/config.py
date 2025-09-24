@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     ha_base_url: Optional[str] = Field(default=None, env="HA_BASE_URL")
     ha_token: Optional[str] = Field(default=None, env="HA_TOKEN")
     
+    # Raspberry Pi Configuration
+    pi_host: Optional[str] = Field(default=None, env="PI_HOST")
+    pi_port: int = Field(default=22, env="PI_PORT")
+    pi_username: Optional[str] = Field(default="pi", env="PI_USERNAME")
+    pi_password: Optional[str] = Field(default=None, env="PI_PASSWORD")
+    pi_key_file: Optional[str] = Field(default=None, env="PI_KEY_FILE")
+    pi_gpio_enabled: bool = Field(default=True, env="PI_GPIO_ENABLED")
+    
     # Vector Database
     chroma_persist_directory: str = Field(default="./data/chroma", env="CHROMA_PERSIST_DIRECTORY")
     

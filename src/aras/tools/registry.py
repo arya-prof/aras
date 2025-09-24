@@ -7,6 +7,7 @@ from .system_tools import FileOperationsTool, ProcessManagementTool, SystemContr
 from .file_tools import FileCreateRemoveTool
 from .web_tools import WebSearchTool, BrowserAutomationTool, APITool
 from .home_tools import DeviceControlTool, SceneManagementTool, ClimateControlTool
+from .mock_pi_tool import MockPiControlTool
 from .communication_tools import EmailTool, NotificationTool
 from .telegram_tools import TelegramTool
 from .knowledge_tools import MemoryOperationsTool, VectorSearchTool
@@ -33,6 +34,7 @@ def create_tool_registry() -> ToolRegistry:
     registry.register_tool(DeviceControlTool())
     registry.register_tool(SceneManagementTool())
     registry.register_tool(ClimateControlTool())
+    registry.register_tool(MockPiControlTool())
     
     # Communication tools
     registry.register_tool(EmailTool())

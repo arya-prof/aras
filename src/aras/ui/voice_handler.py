@@ -343,6 +343,7 @@ Available capabilities:
 - Knowledge management and memory
 - Image and voice processing
 - Camera control and recording
+- Raspberry Pi control and GPIO operations
 
 When responding:
 1. Be helpful and conversational, addressing {settings.owner_name} directly
@@ -401,8 +402,19 @@ Current context: {settings.owner_name} is interacting with you via voice command
             
             command_lower = command.lower()
             
+            # Raspberry Pi commands - CHECK THIS FIRST (before other status checks)
+            if any(word in command_lower for word in ['raspberry', 'pi', 'gpio', 'pin', 'led', 'relay', 'sensor']):
+                action_result['actions'].append({
+                    'type': 'raspberry_pi',
+                    'description': 'Control Raspberry Pi devices and GPIO'
+                })
+                action_result['action_taken'] = True
+                
+                # Execute mock Pi tool
+                asyncio.run(self._execute_pi_command(command, action_result))
+            
             # Home status requests
-            if any(word in command_lower for word in ['home', 'status', 'devices', 'lights', 'temperature', 'climate']):
+            elif any(word in command_lower for word in ['home', 'status', 'devices', 'lights', 'temperature', 'climate']):
                 if any(word in command_lower for word in ['status', 'show', 'what', 'how']):
                     action_result['actions'].append({
                         'type': 'home_status',
@@ -657,6 +669,118 @@ Current context: {settings.owner_name} is interacting with you via voice command
         # For now, default to desktop
         desktop_path = Path.home() / 'Desktop'
         return str(desktop_path / dirname)
+    
+    async def _execute_pi_command(self, command: str, action_result: Dict[str, Any]):
+        """Execute Raspberry Pi commands using the mock Pi tool."""
+        try:
+            if not self.tool_registry:
+                print("[DEBUG-PI] ERROR: No tool registry available")
+                return
+            
+            # Get the mock Pi tool
+            pi_tool = self.tool_registry.get_tool("mock_pi_control")
+            if not pi_tool:
+                print("[DEBUG-PI] ERROR: Mock Pi tool not found")
+                return
+            
+            command_lower = command.lower()
+            
+            # Initialize tool if needed
+            if not hasattr(pi_tool, '_initialized') or not pi_tool._initialized:
+                await pi_tool.initialize()
+                pi_tool._initialized = True
+            
+            # Determine operation based on command
+            if any(word in command_lower for word in ['status', 'temperature', 'memory', 'uptime', 'info']):
+                # System info request
+                result = await pi_tool.execute({
+                    "operation": "get_system_info"
+                })
+                action_result['execution_results'].append({
+                    'tool': 'mock_pi_control',
+                    'operation': 'get_system_info',
+                    'result': result
+                })
+                print(f"[DEBUG-PI] System info result: {result}")
+                
+            elif any(word in command_lower for word in ['turn on', 'turn off', 'set', 'control']):
+                if any(word in command_lower for word in ['led', 'light']):
+                    # LED control
+                    pin = self._extract_pin_number(command)
+                    brightness = self._extract_brightness(command)
+                    
+                    result = await pi_tool.execute({
+                        "operation": "control_light",
+                        "pin": pin or 18,
+                        "brightness": brightness or 100
+                    })
+                    action_result['execution_results'].append({
+                        'tool': 'mock_pi_control',
+                        'operation': 'control_light',
+                        'result': result
+                    })
+                    print(f"[DEBUG-PI] LED control result: {result}")
+                    
+                elif any(word in command_lower for word in ['relay', 'switch']):
+                    # Relay control
+                    pin = self._extract_pin_number(command)
+                    state = any(word in command_lower for word in ['on', 'turn on', 'enable'])
+                    
+                    result = await pi_tool.execute({
+                        "operation": "control_relay",
+                        "pin": pin or 21,
+                        "state": state
+                    })
+                    action_result['execution_results'].append({
+                        'tool': 'mock_pi_control',
+                        'operation': 'control_relay',
+                        'result': result
+                    })
+                    print(f"[DEBUG-PI] Relay control result: {result}")
+                    
+            elif any(word in command_lower for word in ['read', 'check', 'sensor']):
+                # Sensor reading
+                pin = self._extract_pin_number(command)
+                
+                result = await pi_tool.execute({
+                    "operation": "read_sensor",
+                    "pin": pin or 24,
+                    "sensor_type": "digital"
+                })
+                action_result['execution_results'].append({
+                    'tool': 'mock_pi_control',
+                    'operation': 'read_sensor',
+                    'result': result
+                })
+                print(f"[DEBUG-PI] Sensor read result: {result}")
+                
+        except Exception as e:
+            print(f"[DEBUG-PI] ERROR: Failed to execute Pi command: {e}")
+            action_result['execution_results'].append({
+                'tool': 'mock_pi_control',
+                'error': str(e)
+            })
+    
+    def _extract_pin_number(self, command: str) -> int:
+        """Extract pin number from command."""
+        import re
+        # Look for "pin X" or "pinX" patterns
+        match = re.search(r'pin\s*(\d+)', command.lower())
+        if match:
+            return int(match.group(1))
+        return None
+    
+    def _extract_brightness(self, command: str) -> int:
+        """Extract brightness percentage from command."""
+        import re
+        # Look for percentage patterns like "75%" or "75 percent"
+        match = re.search(r'(\d+)%', command)
+        if match:
+            return int(match.group(1))
+        match = re.search(r'(\d+)\s*percent', command.lower())
+        if match:
+            return int(match.group(1))
+        return None
     
     def speak_response(self, text: str):
         """Convert text to speech with persistent audio output."""
