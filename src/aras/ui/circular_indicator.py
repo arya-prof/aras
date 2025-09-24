@@ -60,6 +60,11 @@ class CircularIndicator(QWidget):
     def _update_visualizer_state(self):
         """Update the visualizer state based on current status."""
         try:
+            # Safety check - ensure visualizer exists
+            if not hasattr(self, 'visualizer') or self.visualizer is None:
+                print("Warning: Visualizer not available, skipping state update")
+                return
+                
             import time
             current_time = time.time()
             
@@ -101,6 +106,8 @@ class CircularIndicator(QWidget):
                 
         except Exception as e:
             print(f"Error updating visualizer state: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _process_pending_state(self):
         """Process any pending state change after debounce delay."""
@@ -136,27 +143,33 @@ class CircularIndicator(QWidget):
     
     def set_last_command(self, command: str):
         """Set the last voice command."""
-        self._last_command = command
-        # Trigger a brief glow effect for command received
-        if command:
-            try:
-                self.visualizer.set_glow_mode(True)
-                # Reset glow after 1 second
-                QTimer.singleShot(1000, lambda: self._reset_glow())
-            except Exception as e:
-                print(f"Error setting glow for command: {e}")
+        try:
+            self._last_command = command
+            # Trigger a brief glow effect for command received
+            if command:
+                try:
+                    self.visualizer.set_glow_mode(True)
+                    # Reset glow after 1 second
+                    QTimer.singleShot(1000, lambda: self._reset_glow())
+                except Exception as e:
+                    print(f"Error setting glow for command: {e}")
+        except Exception as e:
+            print(f"Error in set_last_command: {e}")
     
     def set_last_response(self, response: str):
         """Set the last voice response."""
-        self._last_response = response
-        # Trigger a brief glow effect for response generated
-        if response:
-            try:
-                self.visualizer.set_glow_mode(True)
-                # Reset glow after 1 second
-                QTimer.singleShot(1000, lambda: self._reset_glow())
-            except Exception as e:
-                print(f"Error setting glow for response: {e}")
+        try:
+            self._last_response = response
+            # Trigger a brief glow effect for response generated
+            if response:
+                try:
+                    self.visualizer.set_glow_mode(True)
+                    # Reset glow after 1 second
+                    QTimer.singleShot(1000, lambda: self._reset_glow())
+                except Exception as e:
+                    print(f"Error setting glow for response: {e}")
+        except Exception as e:
+            print(f"Error in set_last_response: {e}")
     
     def _reset_glow(self):
         """Reset glow mode safely."""
@@ -342,44 +355,76 @@ class HeadlessAgentWindow(QWidget):
     
     def on_command_processed(self, command: str, result: dict):
         """Handle command processed signal."""
-        import time
-        timestamp = int(time.time() * 1000)
-        print(f"[DEBUG-UI-{timestamp}] COMMAND_PROCESSED: '{command}' -> {result}")
-        self.indicator.set_last_command(command)
-        
-        # Set processing state briefly
-        self.voice_processing = True
-        self.indicator.set_voice_processing(True)
-        self.update_status_text()
-        print(f"[DEBUG-UI-{timestamp}] UI_STATE_UPDATE: Voice processing state set to True")
-        
-        # Reset processing state after a short delay
-        QTimer.singleShot(2000, lambda: self.set_voice_processing_false())
-        print(f"[DEBUG-UI-{timestamp}] UI_TIMER_SET: Processing state reset timer set for 2000ms")
-        
-        # Handle response immediately to avoid duplication with voice_response signal
-        if result.get('response'):
-            # Check for duplicate response within the last 3 seconds
-            current_time = time.time()
-            response_text = result['response']
+        try:
+            import time
+            timestamp = int(time.time() * 1000)
+            print(f"[DEBUG-UI-{timestamp}] COMMAND_PROCESSED: '{command}' -> {result}")
             
-            if hasattr(self, '_last_response_time') and hasattr(self, '_last_response_text'):
-                if (current_time - self._last_response_time < 3.0 and 
-                    self._last_response_text == response_text):
-                    print(f"[DEBUG-UI-{timestamp}] DUPLICATE_RESPONSE_IGNORED: Ignoring duplicate response within 3 seconds")
-                    return
+            # Safely set command
+            try:
+                self.indicator.set_last_command(command)
+            except Exception as e:
+                print(f"[DEBUG-UI-{timestamp}] ERROR setting command: {e}")
             
-            # Update last response tracking
-            self._last_response_time = current_time
-            self._last_response_text = response_text
+            # Set processing state briefly
+            try:
+                self.voice_processing = True
+                self.indicator.set_voice_processing(True)
+                self.update_status_text()
+                print(f"[DEBUG-UI-{timestamp}] UI_STATE_UPDATE: Voice processing state set to True")
+            except Exception as e:
+                print(f"[DEBUG-UI-{timestamp}] ERROR setting processing state: {e}")
             
-            print(f"[DEBUG-UI-{timestamp}] IMMEDIATE_RESPONSE: Handling response from command_processed")
-            self.indicator.set_last_response(response_text)
+            # Reset processing state after a short delay
+            try:
+                QTimer.singleShot(2000, lambda: self.set_voice_processing_false())
+                print(f"[DEBUG-UI-{timestamp}] UI_TIMER_SET: Processing state reset timer set for 2000ms")
+            except Exception as e:
+                print(f"[DEBUG-UI-{timestamp}] ERROR setting timer: {e}")
             
-            # Handle TTS
-            if hasattr(self, 'voice_processor') and hasattr(self.voice_processor, 'handler'):
-                print(f"[DEBUG-UI-{timestamp}] TTS_HANDLING: Speaking response via command_processed")
-                self.voice_processor.handler.speak_response(response_text)
+            # Handle response immediately to avoid duplication with voice_response signal
+            if result.get('response'):
+                try:
+                    # Check for duplicate response within the last 3 seconds
+                    current_time = time.time()
+                    response_text = result['response']
+                    
+                    if hasattr(self, '_last_response_time') and hasattr(self, '_last_response_text'):
+                        if (current_time - self._last_response_time < 3.0 and 
+                            self._last_response_text == response_text):
+                            print(f"[DEBUG-UI-{timestamp}] DUPLICATE_RESPONSE_IGNORED: Ignoring duplicate response within 3 seconds")
+                            return
+                    
+                    # Update last response tracking
+                    self._last_response_time = current_time
+                    self._last_response_text = response_text
+                    
+                    print(f"[DEBUG-UI-{timestamp}] IMMEDIATE_RESPONSE: Handling response from command_processed")
+                    
+                    # Safely set response
+                    try:
+                        self.indicator.set_last_response(response_text)
+                    except Exception as e:
+                        print(f"[DEBUG-UI-{timestamp}] ERROR setting response: {e}")
+                    
+                    # Handle TTS with error handling and timeout
+                    if hasattr(self, 'voice_processor') and hasattr(self.voice_processor, 'handler'):
+                        print(f"[DEBUG-UI-{timestamp}] TTS_HANDLING: Speaking response via command_processed")
+                        try:
+                            # Use QTimer to make TTS non-blocking
+                            QTimer.singleShot(0, lambda: self._speak_response_async(response_text, timestamp))
+                        except Exception as e:
+                            print(f"[DEBUG-UI-{timestamp}] ERROR in TTS setup: {e}")
+                    else:
+                        print(f"[DEBUG-UI-{timestamp}] ERROR: Voice processor not available")
+                        
+                except Exception as e:
+                    print(f"[DEBUG-UI-{timestamp}] ERROR handling response: {e}")
+                    
+        except Exception as e:
+            print(f"[DEBUG-UI] CRITICAL ERROR in on_command_processed: {e}")
+            import traceback
+            traceback.print_exc()
     
     def on_voice_response(self, response: str):
         """Handle voice response signal - DISABLED to avoid duplication."""
@@ -402,6 +447,27 @@ class HeadlessAgentWindow(QWidget):
         self.indicator.set_voice_responding(False)
         # Don't resume listening - it should already be running continuously
         self.update_status_text()
+    
+    def _speak_response_async(self, response_text: str, timestamp: int):
+        """Speak response asynchronously with timeout protection."""
+        try:
+            print(f"[DEBUG-UI-{timestamp}] TTS_ASYNC: Starting async TTS")
+            self.voice_processor.handler.speak_response(response_text)
+            print(f"[DEBUG-UI-{timestamp}] TTS_ASYNC: TTS completed")
+        except Exception as e:
+            print(f"[DEBUG-UI-{timestamp}] ERROR in async TTS: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def on_tts_switch(self):
+        """Handle TTS engine switch to prevent visual glitches."""
+        # Briefly set to processing state during TTS switch
+        self.voice_processing = True
+        self.indicator.set_voice_processing(True)
+        self.update_status_text()
+        
+        # Reset after a short delay
+        QTimer.singleShot(500, lambda: self.set_voice_processing_false())
     
     def set_voice_processing_false(self):
         """Set voice processing to false."""

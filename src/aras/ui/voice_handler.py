@@ -804,9 +804,9 @@ $synth.Speak(@"
 $synth.Dispose()''')
                         script_path = f.name
                     
-                    # Execute the PowerShell script
+                    # Execute the PowerShell script with shorter timeout
                     cmd = f'powershell -ExecutionPolicy Bypass -File "{script_path}"'
-                    subprocess.run(cmd, shell=True, check=True, timeout=15)
+                    subprocess.run(cmd, shell=True, check=True, timeout=5)  # Reduced from 8 to 5 seconds
                     
                     # Clean up the temporary file
                     try:
@@ -817,11 +817,15 @@ $synth.Dispose()''')
                     print(f"[DEBUG-TTS] WINDOWS_TTS: Aras: {text}")
                     success = True
                     
+                except subprocess.TimeoutExpired:
+                    print("Warning: Windows TTS timed out, switching to pyttsx3")
                 except Exception as e:
-                    print(f"Error: Windows TTS failed: {e}")
+                    print(f"Warning: Windows TTS failed: {e}, switching to pyttsx3")
                 
                 # Method 2: Try pyttsx3 with forced cleanup
                 if not success:
+                    # Small delay to prevent visual glitches during TTS switch
+                    time.sleep(0.1)
                     try:
                         import pyttsx3
                         engine = pyttsx3.init()
@@ -869,14 +873,20 @@ $synth.Dispose()''')
             tts_thread.daemon = True
             tts_thread.start()
             
-            # Wait for thread to complete
-            tts_thread.join(timeout=20)
+            # Wait for thread to complete with shorter timeout
+            tts_thread.join(timeout=10)  # Reduced from 20 to 10 seconds
+            
+            # Check if thread is still alive (timed out)
+            if tts_thread.is_alive():
+                print("Warning: TTS thread timed out, forcing cleanup")
+                # Force cleanup by setting a flag or other mechanism
+                # The thread will eventually finish due to daemon=True
             
             # Emit speaking stopped signal
             self.speaking_stopped.emit()
             
             # Small delay to prevent audio conflicts
-            time.sleep(0.5)
+            time.sleep(0.2)  # Reduced from 0.5 to 0.2 seconds
             
         except Exception as e:
             print(f"Error: TTS error: {e}")

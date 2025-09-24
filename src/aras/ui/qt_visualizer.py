@@ -174,9 +174,12 @@ class QtVisualizer(QWidget):
 
     def set_glow_mode(self, glow: bool):
         """Set glow mode."""
-        if glow:
-            self.set_state("glow")
-        # Don't automatically reset to "active" - let the state management handle it
+        try:
+            if glow:
+                self.set_state("glow")
+            # Don't automatically reset to "active" - let the state management handle it
+        except Exception as e:
+            print(f"Error in set_glow_mode: {e}")
 
     def mousePressEvent(self, event):
         """Handle mouse press events - pass to parent window for dragging."""
