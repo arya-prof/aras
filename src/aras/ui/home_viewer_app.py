@@ -3,14 +3,11 @@ Main PyQt6 application for 3D and 2D home visualization.
 """
 
 import sys
-import os
-import math
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy, QTabWidget,
-                            QDialog, QVBoxLayout, QHBoxLayout, QCheckBox, QSpinBox, QComboBox, QGroupBox)
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+                            QDialog, QCheckBox, QSpinBox, QComboBox, QGroupBox)
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
-from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 try:
     from .home_3d_viewer import Home3DViewer
@@ -198,255 +195,6 @@ class HomeViewerApp(QMainWindow):
         switcher_layout.addWidget(self.settings_button)
         
         parent_layout.addLayout(switcher_layout)
-    
-    def create_light_panel_old(self, parent_layout):
-        """Create the modern light control panel with 17 light buttons."""
-        light_panel = QWidget()
-        light_panel.setStyleSheet("""
-            QWidget {
-                background-color: transparent;
-                border-radius: 10px;
-                margin: 5px;
-            }
-        """)
-        light_layout = QVBoxLayout(light_panel)
-        light_layout.setSpacing(0)
-        light_layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Modern light panel header with control buttons
-        header_layout = QHBoxLayout()
-        
-        light_title = QLabel("Lights")
-        light_title.setStyleSheet("""
-            font-size: 14px; 
-            font-weight: bold; 
-            color: #ffffff;
-            padding: 2px;
-        """)
-        header_layout.addWidget(light_title)
-        
-        # Device status indicator
-        self.light_status = QLabel("0/22 ON")
-        self.light_status.setStyleSheet("""
-            font-size: 12px; 
-            color: #888888;
-            padding: 2px;
-        """)
-        header_layout.addWidget(self.light_status)
-        
-        # Add stretch to push control buttons to the right
-        header_layout.addStretch()
-        
-        # Control buttons in the header
-        control_layout = QHBoxLayout()
-        control_layout.setSpacing(0)
-        
-        all_on_btn = QPushButton("On")
-        all_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        all_on_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #666666, stop:1 #444444);
-                color: #ffffff;
-                font-weight: bold;
-                font-size: 12px;
-                padding: 1px 3px;
-                border: 1px solid #777777;
-                border-radius: 3px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #777777, stop:1 #555555);
-                border: 1px solid #888888;
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #555555, stop:1 #333333);
-            }
-        """)
-        all_on_btn.clicked.connect(self.all_lights_on)
-        control_layout.addWidget(all_on_btn)
-        
-        all_off_btn = QPushButton("Off")
-        all_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        all_off_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #666666, stop:1 #444444);
-                color: #ffffff;
-                font-weight: bold;
-                font-size: 12px;
-                padding: 1px 3px;
-                border: 1px solid #777777;
-                border-radius: 3px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #777777, stop:1 #555555);
-                border: 1px solid #888888;
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #555555, stop:1 #333333);
-            }
-        """)
-        all_off_btn.clicked.connect(self.all_lights_off)
-        control_layout.addWidget(all_off_btn)
-        
-        # Add control buttons to header layout
-        header_layout.addLayout(control_layout)
-        
-        light_layout.addLayout(header_layout)
-        
-        # Create room-based layout for light controls
-        light_list_layout = QVBoxLayout()
-        light_list_layout.setSpacing(8)
-        
-        # Define room layout with device assignments
-        self.room_layout = {
-            "Bedroom 1": [0, 1, 2, 19],  # L1, L2, L3, AC1
-            "Bedroom 2": [3, 4, 5],      # L4, L5, L6
-            "Bedroom 3": [6, 7, 8, 17, 20],  # L7, L8, L9, TV1, AC2
-            "Kitchen": [9, 10],          # L10, L11
-            "Living Room": [11, 12, 13, 18, 21], # L12, L13, L14, TV2, AC3
-            "Bathroom": [14],            # L15
-            "Outside": [15, 16]          # L16, L17
-        }
-        
-        # Device type mapping
-        self.device_types = {
-            17: "TV",   # TV1 in Bedroom 3
-            18: "TV",   # TV2 in Living Room
-            19: "AC",   # AC1 in Bedroom 1
-            20: "AC",   # AC2 in Bedroom 3
-            21: "AC"    # AC3 in Living Room
-        }
-        
-        # Create 22 device controls (17 lights + 2 TVs + 3 ACs)
-        self.light_buttons = []
-        self.light_labels = []
-        for i in range(22):
-            # Create button
-            btn = QPushButton()
-            btn.setMinimumSize(60, 25)
-            btn.setMaximumSize(60, 25)
-            btn.setText("OFF")
-            btn.setCheckable(True)
-            btn.setStyleSheet(self.get_light_button_style(False))
-            btn.clicked.connect(lambda checked, idx=i: self.toggle_light(idx))
-            
-            self.light_buttons.append(btn)
-            self.light_labels.append(None)  # Will be set per room
-        
-        # Create room sections
-        for room_name, device_indices in self.room_layout.items():
-            # Room header with controls
-            room_header_layout = QHBoxLayout()
-            
-            room_header = QLabel(room_name)
-            room_header.setStyleSheet("""
-                font-size: 13px;
-                font-weight: bold;
-                color: #4CAF50;
-                padding: 4px 0px;
-            """)
-            room_header_layout.addWidget(room_header)
-            
-            # Add stretch to push buttons to the right
-            room_header_layout.addStretch()
-            
-            # Room control buttons
-            room_on_btn = QPushButton("On")
-            room_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            room_on_btn.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                        stop:0 #4CAF50, stop:1 #45a049);
-                    color: #ffffff;
-                    font-weight: bold;
-                    font-size: 10px;
-                    padding: 2px 6px;
-                    border: 1px solid #4CAF50;
-                    border-radius: 3px;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                        stop:0 #5CBF60, stop:1 #4CAF50);
-                }
-            """)
-            room_on_btn.clicked.connect(lambda checked, room=room_name: self.room_lights_on(room))
-            
-            room_off_btn = QPushButton("Off")
-            room_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            room_off_btn.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                        stop:0 #666666, stop:1 #444444);
-                    color: #ffffff;
-                    font-weight: bold;
-                    font-size: 10px;
-                    padding: 2px 6px;
-                    border: 1px solid #777777;
-                    border-radius: 3px;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                        stop:0 #777777, stop:1 #555555);
-                }
-            """)
-            room_off_btn.clicked.connect(lambda checked, room=room_name: self.room_lights_off(room))
-            
-            room_header_layout.addWidget(room_on_btn)
-            room_header_layout.addWidget(room_off_btn)
-            
-            light_list_layout.addLayout(room_header_layout)
-            
-            # Room devices
-            room_layout = QVBoxLayout()
-            room_layout.setSpacing(2)
-            room_layout.setContentsMargins(10, 0, 0, 0)
-            
-            for i, device_idx in enumerate(device_indices):
-                # Create horizontal layout for each device
-                device_row = QHBoxLayout()
-                device_row.setSpacing(8)
-                
-                # Determine device type and global number
-                device_type = self.device_types.get(device_idx, "L")
-                if device_type == "TV":
-                    global_label = f"TV{device_idx-16}"  # TV1, TV2
-                elif device_type == "AC":
-                    global_label = f"AC{device_idx-18}"  # AC1, AC2, AC3
-                else:
-                    global_label = f"L{device_idx+1}"
-                
-                # Create label for the device with both global and local numbering
-                label = QLabel(f"{global_label} ({i+1}):")
-                label.setStyleSheet("""
-                    font-size: 11px;
-                    color: #cccccc;
-                    font-weight: bold;
-                    min-width: 50px;
-                """)
-                label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-                
-                # Set the label in our list
-                self.light_labels[device_idx] = label
-            
-            # Add label and button to row
-                device_row.addWidget(label)
-                device_row.addWidget(self.light_buttons[device_idx])
-                device_row.addStretch()  # Push content to left
-                
-                # Add row to room layout
-                room_layout.addLayout(device_row)
-            
-            # Add room layout to main layout
-            light_list_layout.addLayout(room_layout)
-        
-        light_layout.addLayout(light_list_layout)
-        
-        parent_layout.addWidget(light_panel)
     
     def create_tabbed_interface(self, parent_layout):
         """Create the tabbed interface organized by rooms."""
@@ -1230,17 +978,13 @@ class HomeViewerApp(QMainWindow):
     
     def on_3d_view_changed(self, x, y, z):
         """Handle 3D view changes."""
-        if self.sync_views:
-            # Update 2D view based on 3D camera position
-            # This is a simplified synchronization
-            pass
+        # TODO: Implement 3D to 2D view synchronization
+        pass
     
     def on_2d_view_changed(self, pan_x, pan_y, zoom):
         """Handle 2D view changes."""
-        if self.sync_views:
-            # Update 3D view based on 2D view
-            # This is a simplified synchronization
-            pass
+        # TODO: Implement 2D to 3D view synchronization
+        pass
     
     def on_room_selected(self, room_name):
         """Handle room selection."""
