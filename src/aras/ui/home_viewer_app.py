@@ -6,7 +6,7 @@ import sys
 import os
 import math
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout)
+                            QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
@@ -54,23 +54,34 @@ class HomeViewerApp(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Main layout
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout - horizontal split
+        main_layout = QHBoxLayout(central_widget)
+        
+        # Left side - Viewer (50% of width)
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
         
         # Create view switcher
-        self.create_view_switcher(main_layout)
-        
-        # Create light control panel (centered, not full width)
-        light_panel_container = QHBoxLayout()
-        light_panel_container.addStretch()
-        self.create_light_panel(light_panel_container)
-        light_panel_container.addStretch()
-        main_layout.addLayout(light_panel_container)
+        self.create_view_switcher(left_layout)
         
         # Create stacked widget for views
         self.stacked_widget = QWidget()
         self.stacked_layout = QHBoxLayout(self.stacked_widget)
-        main_layout.addWidget(self.stacked_widget)
+        left_layout.addWidget(self.stacked_widget, 1)  # Add stretch factor to fill space
+        
+        # Right side - Controls (50% of width)
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        
+        # Create light control panel at the top
+        self.create_light_panel(right_layout)
+        
+        # Add stretch to push panel to top
+        right_layout.addStretch()
+        
+        # Add panels to main layout with equal stretch
+        main_layout.addWidget(left_panel, 1)  # 50% width
+        main_layout.addWidget(right_panel, 1)  # 50% width
         
         # Create 3D panel
         self.create_3d_panel()
@@ -105,19 +116,18 @@ class HomeViewerApp(QMainWindow):
     def create_light_panel(self, parent_layout):
         """Create the modern light control panel with 17 light buttons."""
         light_panel = QWidget()
-        light_panel.setMaximumWidth(600)  # Limit the panel width
         light_panel.setStyleSheet("""
             QWidget {
-                background-color: #2b2b2b;
+                background-color: transparent;
                 border-radius: 10px;
                 margin: 5px;
             }
         """)
         light_layout = QVBoxLayout(light_panel)
-        light_layout.setSpacing(8)
+        light_layout.setSpacing(0)
         light_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Modern light panel header
+        # Modern light panel header with control buttons
         header_layout = QHBoxLayout()
         
         light_title = QLabel("Lights")
@@ -136,33 +146,125 @@ class HomeViewerApp(QMainWindow):
             color: #888888;
             padding: 2px;
         """)
-        header_layout.addStretch()
         header_layout.addWidget(self.light_status)
+        
+        # Add stretch to push control buttons to the right
+        header_layout.addStretch()
+        
+        # Control buttons in the header
+        control_layout = QHBoxLayout()
+        control_layout.setSpacing(0)
+        
+        all_on_btn = QPushButton("On")
+        all_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        all_on_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #666666, stop:1 #444444);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 1px 3px;
+                border: 1px solid #777777;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #777777, stop:1 #555555);
+                border: 1px solid #888888;
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #555555, stop:1 #333333);
+            }
+        """)
+        all_on_btn.clicked.connect(self.all_lights_on)
+        control_layout.addWidget(all_on_btn)
+        
+        all_off_btn = QPushButton("Off")
+        all_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        all_off_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #666666, stop:1 #444444);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 1px 3px;
+                border: 1px solid #777777;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #777777, stop:1 #555555);
+                border: 1px solid #888888;
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #555555, stop:1 #333333);
+            }
+        """)
+        all_off_btn.clicked.connect(self.all_lights_off)
+        control_layout.addWidget(all_off_btn)
+        
+        # Scene button
+        scene_btn = QPushButton("Scene")
+        scene_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        scene_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #666666, stop:1 #444444);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 2px 4px;
+                border: 1px solid #777777;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #777777, stop:1 #555555);
+                border: 1px solid #888888;
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #555555, stop:1 #333333);
+            }
+        """)
+        scene_btn.clicked.connect(self.toggle_scene)
+        control_layout.addWidget(scene_btn)
+        
+        # Add control buttons to header layout
+        header_layout.addLayout(control_layout)
         
         light_layout.addLayout(header_layout)
         
-        # Create compact grid for light buttons with labels
-        button_grid = QGridLayout()
-        button_grid.setSpacing(0)
+        # Create vertical list for light controls
+        light_list_layout = QVBoxLayout()
+        light_list_layout.setSpacing(0)
         
-        # Create 17 compact light buttons with labels
+        # Create 17 light controls in vertical list
         self.light_buttons = []
         self.light_labels = []
         for i in range(17):
+            # Create horizontal layout for each light
+            light_row = QHBoxLayout()
+            light_row.setSpacing(0)
+            
             # Create label for the light
-            label = QLabel(f"L{i+1}")
+            label = QLabel(f"L{i+1}:")
             label.setStyleSheet("""
-                font-size: 9px;
-                color: #aaaaaa;
+                font-size: 12px;
+                color: #ffffff;
                 font-weight: bold;
-                text-align: center;
+                min-width: 30px;
             """)
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setAlignment(Qt.AlignmentFlag.AlignLeft)
             
             # Create button
             btn = QPushButton()
-            btn.setMinimumSize(50, 30)
-            btn.setMaximumSize(50, 30)
+            btn.setMinimumSize(60, 25)
+            btn.setMaximumSize(60, 25)
             btn.setText("OFF")
             btn.setCheckable(True)
             btn.setStyleSheet(self.get_light_button_style(False))
@@ -171,94 +273,15 @@ class HomeViewerApp(QMainWindow):
             self.light_buttons.append(btn)
             self.light_labels.append(label)
             
-            # Position in grid (6 columns for more compact layout)
-            row = (i // 6) * 2  # Double row spacing for label + button
-            col = i % 6
+            # Add label and button to row
+            light_row.addWidget(label)
+            light_row.addWidget(btn)
+            light_row.addStretch()  # Push content to left
             
-            # Add label and button to grid
-            button_grid.addWidget(label, row, col)
-            button_grid.addWidget(btn, row + 1, col)
+            # Add row to main layout
+            light_list_layout.addLayout(light_row)
         
-        light_layout.addLayout(button_grid)
-        
-        # Compact control buttons
-        control_layout = QHBoxLayout()
-        control_layout.setSpacing(6)
-        
-        all_on_btn = QPushButton("On")
-        all_on_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #4CAF50, stop:1 #45a049);
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-                padding: 2px 4px;
-                border: none;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #5CBF60, stop:1 #4CAF50);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #45a049, stop:1 #3d8b40);
-            }
-        """)
-        all_on_btn.clicked.connect(self.all_lights_on)
-        control_layout.addWidget(all_on_btn)
-        
-        all_off_btn = QPushButton("Off")
-        all_off_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #f44336, stop:1 #d32f2f);
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-                padding: 2px 4px;
-                border: none;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #f55555, stop:1 #f44336);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #d32f2f, stop:1 #b71c1c);
-            }
-        """)
-        all_off_btn.clicked.connect(self.all_lights_off)
-        control_layout.addWidget(all_off_btn)
-        
-        # Scene button
-        scene_btn = QPushButton("Scene")
-        scene_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #9C27B0, stop:1 #7B1FA2);
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-                padding: 2px 4px;
-                border: none;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #AB47BC, stop:1 #9C27B0);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #7B1FA2, stop:1 #6A1B9A);
-            }
-        """)
-        scene_btn.clicked.connect(self.toggle_scene)
-        control_layout.addWidget(scene_btn)
-        
-        light_layout.addLayout(control_layout)
+        light_layout.addLayout(light_list_layout)
         
         parent_layout.addWidget(light_panel)
     
@@ -313,10 +336,11 @@ class HomeViewerApp(QMainWindow):
         # 3D panel container
         self.panel_3d = QWidget()
         layout_3d = QVBoxLayout(self.panel_3d)
+        layout_3d.setContentsMargins(0, 0, 0, 0)  # Remove margins
         
         # 3D viewer widget
         self.viewer_3d = Home3DViewer()
-        layout_3d.addWidget(self.viewer_3d)
+        layout_3d.addWidget(self.viewer_3d, 1)  # Add stretch factor
         
         # Add to stacked layout
         self.stacked_layout.addWidget(self.panel_3d)
@@ -326,10 +350,11 @@ class HomeViewerApp(QMainWindow):
         # 2D panel container
         self.panel_2d = QWidget()
         layout_2d = QVBoxLayout(self.panel_2d)
+        layout_2d.setContentsMargins(0, 0, 0, 0)  # Remove margins
         
         # 2D viewer widget
         self.viewer_2d = Home2DViewer()
-        layout_2d.addWidget(self.viewer_2d)
+        layout_2d.addWidget(self.viewer_2d, 1)  # Add stretch factor
         
         # Add to stacked layout
         self.stacked_layout.addWidget(self.panel_2d)
@@ -487,17 +512,17 @@ class HomeViewerApp(QMainWindow):
         # Update label color based on light state
         if self.light_states[light_index]:
             label.setStyleSheet("""
-                font-size: 9px;
+                font-size: 12px;
                 color: #4CAF50;
                 font-weight: bold;
-                text-align: center;
+                min-width: 30px;
             """)
         else:
             label.setStyleSheet("""
-                font-size: 9px;
-                color: #aaaaaa;
+                font-size: 12px;
+                color: #ffffff;
                 font-weight: bold;
-                text-align: center;
+                min-width: 30px;
             """)
     
     def update_light_status(self):
