@@ -45,6 +45,12 @@ pyaudio>=0.2.11
 
 # Qt UI (headless only)
 PyQt6>=6.6.0
+PyOpenGL>=3.1.0
+PyOpenGL-accelerate>=3.1.0
+
+# 3D Model Support
+trimesh>=4.0.0
+pygltflib>=1.15.0
 
 # Utilities
 python-dotenv>=1.0.0
