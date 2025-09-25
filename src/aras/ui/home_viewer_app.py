@@ -48,6 +48,10 @@ class HomeViewerApp(QMainWindow):
         # Device states (lights + TVs + ACs)
         self.device_states = [False] * 22  # 17 lights + 2 TVs + 3 ACs, all initially off
         self.light_states = self.device_states  # Keep compatibility with existing code
+        
+        # Camera states
+        self.camera_states = [False] * 8  # 8 cameras, all initially off
+        self.recording_states = [False] * 8  # 8 recording states, all initially off
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -438,10 +442,10 @@ class HomeViewerApp(QMainWindow):
                 border: 1px solid rgba(255, 255, 255, 0.1);
             }
             QTabBar::tab:selected {
-                background-color: rgba(76, 175, 80, 0.8);
+                background-color: rgba(100, 100, 100, 0.8);
                 color: #ffffff;
                 font-weight: bold;
-                border: 1px solid rgba(76, 175, 80, 0.6);
+                border: 1px solid rgba(150, 150, 150, 0.6);
             }
             QTabBar::tab:hover {
                 background-color: rgba(74, 74, 74, 0.8);
@@ -462,6 +466,7 @@ class HomeViewerApp(QMainWindow):
         self.create_room_tab("Living Room", [11, 12, 13, 18, 21]) # L12, L13, L14, TV2, AC3
         self.create_room_tab("Bathroom", [14])            # L15
         self.create_room_tab("Outside", [15, 16])         # L16, L17
+        self.create_security_cameras_tab()
         
         parent_layout.addWidget(self.tab_widget)
     
@@ -482,7 +487,7 @@ class HomeViewerApp(QMainWindow):
         overview_header.setStyleSheet("""
             font-size: 16px;
             font-weight: bold;
-            color: #4CAF50;
+            color: #ffffff;
             padding: 6px 0px;
         """)
         overview_layout.addWidget(overview_header)
@@ -521,7 +526,7 @@ class HomeViewerApp(QMainWindow):
         scenes_header.setStyleSheet("""
             font-size: 14px;
             font-weight: bold;
-            color: #4CAF50;
+            color: #ffffff;
             padding: 10px 0px 4px 0px;
         """)
         overview_layout.addWidget(scenes_header)
@@ -563,7 +568,7 @@ class HomeViewerApp(QMainWindow):
         room_header.setStyleSheet("""
             font-size: 16px;
             font-weight: bold;
-            color: #4CAF50;
+            color: #ffffff;
             padding: 6px 0px;
         """)
         room_layout.addWidget(room_header)
@@ -642,27 +647,349 @@ class HomeViewerApp(QMainWindow):
         room_layout.addStretch()
         self.tab_widget.addTab(room_tab, room_name)
     
+    def create_security_cameras_tab(self):
+        """Create the security cameras tab with camera controls."""
+        cameras_tab = QWidget()
+        cameras_tab.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+            }
+        """)
+        cameras_layout = QVBoxLayout(cameras_tab)
+        cameras_layout.setContentsMargins(8, 8, 8, 8)
+        cameras_layout.setSpacing(6)
+        
+        # Security cameras header
+        cameras_header = QLabel("Security Cameras")
+        cameras_header.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            padding: 6px 0px;
+        """)
+        cameras_layout.addWidget(cameras_header)
+        
+        # Camera status overview
+        status_group = QWidget()
+        status_group.setStyleSheet("""
+            QWidget {
+                background-color: rgba(60, 60, 60, 0.3);
+                border-radius: 8px;
+                padding: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        """)
+        status_layout = QVBoxLayout(status_group)
+        
+        status_title = QLabel("System Status")
+        status_title.setStyleSheet("""
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffffff;
+            padding: 5px 0px;
+        """)
+        status_layout.addWidget(status_title)
+        
+        # Camera count and status
+        self.camera_status_label = QLabel("8 cameras online")
+        self.camera_status_label.setStyleSheet("""
+            font-size: 12px;
+            color: #cccccc;
+            padding: 2px 0px;
+        """)
+        status_layout.addWidget(self.camera_status_label)
+        
+        self.recording_status_label = QLabel("Recording: 3 cameras")
+        self.recording_status_label.setStyleSheet("""
+            font-size: 12px;
+            color: #cccccc;
+            padding: 2px 0px;
+        """)
+        status_layout.addWidget(self.recording_status_label)
+        
+        cameras_layout.addWidget(status_group)
+        
+        # Camera controls
+        controls_header = QLabel("Camera Controls")
+        controls_header.setStyleSheet("""
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffffff;
+            padding: 15px 0px 5px 0px;
+        """)
+        cameras_layout.addWidget(controls_header)
+        
+        # Global camera controls
+        global_controls_layout = QHBoxLayout()
+        global_controls_layout.setSpacing(8)
+        
+        all_record_btn = QPushButton("Start All Recording")
+        all_record_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        all_record_btn.setStyleSheet(self.get_scene_button_style())
+        all_record_btn.clicked.connect(self.start_all_recording)
+        global_controls_layout.addWidget(all_record_btn)
+        
+        all_stop_btn = QPushButton("Stop All Recording")
+        all_stop_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        all_stop_btn.setStyleSheet(self.get_scene_button_style())
+        all_stop_btn.clicked.connect(self.stop_all_recording)
+        global_controls_layout.addWidget(all_stop_btn)
+        
+        global_controls_layout.addStretch()
+        cameras_layout.addLayout(global_controls_layout)
+        
+        # Individual camera controls
+        cameras_list_layout = QVBoxLayout()
+        cameras_list_layout.setSpacing(4)
+        
+        # Define camera locations
+        camera_locations = [
+            ("Front Door", "CAM1"),
+            ("Back Door", "CAM2"),
+            ("Living Room", "CAM3"),
+            ("Kitchen", "CAM4"),
+            ("Bedroom 1", "CAM5"),
+            ("Bedroom 2", "CAM6"),
+            ("Bedroom 3", "CAM7"),
+            ("Garage", "CAM8")
+        ]
+        
+        # Create camera controls
+        self.camera_buttons = []
+        self.camera_recording_buttons = []
+        
+        for i, (location, cam_id) in enumerate(camera_locations):
+            camera_row = QHBoxLayout()
+            camera_row.setSpacing(8)
+            
+            # Camera label
+            camera_label = QLabel(f"{cam_id} - {location}")
+            camera_label.setStyleSheet("""
+                font-size: 12px;
+                color: #cccccc;
+                font-weight: bold;
+                min-width: 120px;
+            """)
+            camera_row.addWidget(camera_label)
+            
+            # Camera on/off button
+            camera_btn = QPushButton("OFF")
+            camera_btn.setMinimumSize(50, 25)
+            camera_btn.setMaximumSize(50, 25)
+            camera_btn.setCheckable(True)
+            camera_btn.setStyleSheet(self.get_camera_button_style(False))
+            camera_btn.clicked.connect(lambda checked, idx=i: self.toggle_camera(idx))
+            self.camera_buttons.append(camera_btn)
+            camera_row.addWidget(camera_btn)
+            
+            # Recording button
+            record_btn = QPushButton("Record")
+            record_btn.setMinimumSize(60, 25)
+            record_btn.setMaximumSize(60, 25)
+            record_btn.setCheckable(True)
+            record_btn.setStyleSheet(self.get_recording_button_style(False))
+            record_btn.clicked.connect(lambda checked, idx=i: self.toggle_recording(idx))
+            self.camera_recording_buttons.append(record_btn)
+            camera_row.addWidget(record_btn)
+            
+            camera_row.addStretch()
+            cameras_list_layout.addLayout(camera_row)
+        
+        cameras_layout.addLayout(cameras_list_layout)
+        cameras_layout.addStretch()
+        
+        self.tab_widget.addTab(cameras_tab, "Security")
+    
+    def get_camera_button_style(self, is_on):
+        """Get the style for camera on/off buttons."""
+        if is_on:
+            return """
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #888888, stop:1 #666666);
+                    color: white;
+                    font-weight: bold;
+                    font-size: 10px;
+                    border: 2px solid #888888;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #999999, stop:1 #777777);
+                    border: 2px solid #999999;
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #777777, stop:1 #555555);
+                }
+            """
+        else:
+            return """
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #666666, stop:1 #444444);
+                    color: #cccccc;
+                    font-weight: bold;
+                    font-size: 10px;
+                    border: 2px solid #666666;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #777777, stop:1 #555555);
+                    color: #dddddd;
+                    border: 2px solid #777777;
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #555555, stop:1 #333333);
+                }
+            """
+    
+    def get_recording_button_style(self, is_recording):
+        """Get the style for recording buttons."""
+        if is_recording:
+            return """
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #cc4444, stop:1 #aa3333);
+                    color: white;
+                    font-weight: bold;
+                    font-size: 10px;
+                    border: 2px solid #cc4444;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #dd5555, stop:1 #bb4444);
+                    border: 2px solid #dd5555;
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #bb3333, stop:1 #992222);
+                }
+            """
+        else:
+            return """
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #666666, stop:1 #444444);
+                    color: #cccccc;
+                    font-weight: bold;
+                    font-size: 10px;
+                    border: 2px solid #666666;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #777777, stop:1 #555555);
+                    color: #dddddd;
+                    border: 2px solid #777777;
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #555555, stop:1 #333333);
+                }
+            """
+    
+    def toggle_camera(self, camera_index):
+        """Toggle a specific camera on/off."""
+        self.camera_states[camera_index] = not self.camera_states[camera_index]
+        self.update_camera_button(camera_index)
+        self.update_camera_status()
+        
+        # Update status
+        if hasattr(self, 'status_label'):
+            state = "ON" if self.camera_states[camera_index] else "OFF"
+            self.status_label.setText(f"Camera {camera_index + 1} turned {state}")
+    
+    def toggle_recording(self, camera_index):
+        """Toggle recording for a specific camera."""
+        if self.camera_states[camera_index]:  # Only allow recording if camera is on
+            self.recording_states[camera_index] = not self.recording_states[camera_index]
+            self.update_recording_button(camera_index)
+            self.update_camera_status()
+            
+            # Update status
+            if hasattr(self, 'status_label'):
+                state = "STARTED" if self.recording_states[camera_index] else "STOPPED"
+                self.status_label.setText(f"Camera {camera_index + 1} recording {state}")
+        else:
+            # Update status
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"Camera {camera_index + 1} must be ON to record")
+    
+    def update_camera_button(self, camera_index):
+        """Update the visual appearance of a camera button."""
+        button = self.camera_buttons[camera_index]
+        button.setText("ON" if self.camera_states[camera_index] else "OFF")
+        button.setChecked(self.camera_states[camera_index])
+        button.setStyleSheet(self.get_camera_button_style(self.camera_states[camera_index]))
+        
+        # If camera is turned off, also stop recording
+        if not self.camera_states[camera_index] and self.recording_states[camera_index]:
+            self.recording_states[camera_index] = False
+            self.update_recording_button(camera_index)
+    
+    def update_recording_button(self, camera_index):
+        """Update the visual appearance of a recording button."""
+        button = self.camera_recording_buttons[camera_index]
+        button.setText("Stop" if self.recording_states[camera_index] else "Record")
+        button.setChecked(self.recording_states[camera_index])
+        button.setStyleSheet(self.get_recording_button_style(self.recording_states[camera_index]))
+    
+    def update_camera_status(self):
+        """Update the camera status display."""
+        if hasattr(self, 'camera_status_label'):
+            on_count = sum(self.camera_states)
+            self.camera_status_label.setText(f"{on_count}/8 cameras online")
+        
+        if hasattr(self, 'recording_status_label'):
+            recording_count = sum(self.recording_states)
+            self.recording_status_label.setText(f"Recording: {recording_count} cameras")
+    
+    def start_all_recording(self):
+        """Start recording on all cameras that are on."""
+        for i in range(8):
+            if self.camera_states[i]:
+                self.recording_states[i] = True
+                self.update_recording_button(i)
+        
+        self.update_camera_status()
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("Started recording on all active cameras")
+    
+    def stop_all_recording(self):
+        """Stop recording on all cameras."""
+        for i in range(8):
+            self.recording_states[i] = False
+            self.update_recording_button(i)
+        
+        self.update_camera_status()
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("Stopped recording on all cameras")
+    
     def get_scene_button_style(self):
         """Get the style for scene buttons."""
         return """
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #4CAF50, stop:1 #45a049);
+                    stop:0 #555555, stop:1 #444444);
                 color: #ffffff;
                 font-weight: bold;
                 font-size: 12px;
                 padding: 8px 16px;
-                border: 1px solid #4CAF50;
+                border: 1px solid #666666;
                 border-radius: 4px;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #5CBF60, stop:1 #4CAF50);
-                border: 1px solid #5CBF60;
+                    stop:0 #666666, stop:1 #555555);
+                border: 1px solid #777777;
             }
             QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #45a049, stop:1 #3d8b40);
+                    stop:0 #444444, stop:1 #333333);
             }
         """
     
@@ -711,21 +1038,21 @@ class HomeViewerApp(QMainWindow):
             return """
                 QPushButton {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #4CAF50, stop:1 #45a049);
+                        stop:0 #888888, stop:1 #666666);
                     color: white;
                     font-weight: bold;
                     font-size: 10px;
-                    border: 2px solid #4CAF50;
+                    border: 2px solid #888888;
                     border-radius: 8px;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #5CBF60, stop:1 #4CAF50);
-                    border: 2px solid #5CBF60;
+                        stop:0 #999999, stop:1 #777777);
+                    border: 2px solid #999999;
                 }
                 QPushButton:pressed {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #45a049, stop:1 #3d8b40);
+                        stop:0 #777777, stop:1 #555555);
                 }
             """
         else:
@@ -952,7 +1279,7 @@ class HomeViewerApp(QMainWindow):
             if self.light_states[light_index]:
                 label.setStyleSheet("""
                     font-size: 11px;
-                    color: #4CAF50;
+                    color: #ffffff;
                     font-weight: bold;
                     min-width: 30px;
                 """)
