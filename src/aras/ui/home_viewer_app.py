@@ -45,8 +45,9 @@ class HomeViewerApp(QMainWindow):
         self.sync_views = True
         self.current_room = None
         
-        # Light states
-        self.light_states = [False] * 17  # 17 lights, all initially off
+        # Device states (lights + TVs + ACs)
+        self.device_states = [False] * 22  # 17 lights + 2 TVs + 3 ACs, all initially off
+        self.light_states = self.device_states  # Keep compatibility with existing code
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -139,8 +140,8 @@ class HomeViewerApp(QMainWindow):
         """)
         header_layout.addWidget(light_title)
         
-        # Light status indicator
-        self.light_status = QLabel("0/17 ON")
+        # Device status indicator
+        self.light_status = QLabel("0/22 ON")
         self.light_status.setStyleSheet("""
             font-size: 12px; 
             color: #888888;
@@ -239,28 +240,34 @@ class HomeViewerApp(QMainWindow):
         
         light_layout.addLayout(header_layout)
         
-        # Create vertical list for light controls
+        # Create room-based layout for light controls
         light_list_layout = QVBoxLayout()
-        light_list_layout.setSpacing(0)
+        light_list_layout.setSpacing(8)
         
-        # Create 17 light controls in vertical list
+        # Define room layout with device assignments
+        self.room_layout = {
+            "Bedroom 1": [0, 1, 2, 19],  # L1, L2, L3, AC1
+            "Bedroom 2": [3, 4, 5],      # L4, L5, L6
+            "Bedroom 3": [6, 7, 8, 17, 20],  # L7, L8, L9, TV1, AC2
+            "Kitchen": [9, 10],          # L10, L11
+            "Living Room": [11, 12, 13, 18, 21], # L12, L13, L14, TV2, AC3
+            "Bathroom": [14],            # L15
+            "Outside": [15, 16]          # L16, L17
+        }
+        
+        # Device type mapping
+        self.device_types = {
+            17: "TV",   # TV1 in Bedroom 3
+            18: "TV",   # TV2 in Living Room
+            19: "AC",   # AC1 in Bedroom 1
+            20: "AC",   # AC2 in Bedroom 3
+            21: "AC"    # AC3 in Living Room
+        }
+        
+        # Create 22 device controls (17 lights + 2 TVs + 3 ACs)
         self.light_buttons = []
         self.light_labels = []
-        for i in range(17):
-            # Create horizontal layout for each light
-            light_row = QHBoxLayout()
-            light_row.setSpacing(0)
-            
-            # Create label for the light
-            label = QLabel(f"L{i+1}:")
-            label.setStyleSheet("""
-                font-size: 12px;
-                color: #ffffff;
-                font-weight: bold;
-                min-width: 30px;
-            """)
-            label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            
+        for i in range(22):
             # Create button
             btn = QPushButton()
             btn.setMinimumSize(60, 25)
@@ -271,15 +278,113 @@ class HomeViewerApp(QMainWindow):
             btn.clicked.connect(lambda checked, idx=i: self.toggle_light(idx))
             
             self.light_buttons.append(btn)
-            self.light_labels.append(label)
+            self.light_labels.append(None)  # Will be set per room
+        
+        # Create room sections
+        for room_name, device_indices in self.room_layout.items():
+            # Room header with controls
+            room_header_layout = QHBoxLayout()
             
-            # Add label and button to row
-            light_row.addWidget(label)
-            light_row.addWidget(btn)
-            light_row.addStretch()  # Push content to left
+            room_header = QLabel(room_name)
+            room_header.setStyleSheet("""
+                font-size: 13px;
+                font-weight: bold;
+                color: #4CAF50;
+                padding: 4px 0px;
+            """)
+            room_header_layout.addWidget(room_header)
             
-            # Add row to main layout
-            light_list_layout.addLayout(light_row)
+            # Add stretch to push buttons to the right
+            room_header_layout.addStretch()
+            
+            # Room control buttons
+            room_on_btn = QPushButton("On")
+            room_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            room_on_btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                        stop:0 #4CAF50, stop:1 #45a049);
+                    color: #ffffff;
+                    font-weight: bold;
+                    font-size: 10px;
+                    padding: 2px 6px;
+                    border: 1px solid #4CAF50;
+                    border-radius: 3px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                        stop:0 #5CBF60, stop:1 #4CAF50);
+                }
+            """)
+            room_on_btn.clicked.connect(lambda checked, room=room_name: self.room_lights_on(room))
+            
+            room_off_btn = QPushButton("Off")
+            room_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            room_off_btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                        stop:0 #666666, stop:1 #444444);
+                    color: #ffffff;
+                    font-weight: bold;
+                    font-size: 10px;
+                    padding: 2px 6px;
+                    border: 1px solid #777777;
+                    border-radius: 3px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                        stop:0 #777777, stop:1 #555555);
+                }
+            """)
+            room_off_btn.clicked.connect(lambda checked, room=room_name: self.room_lights_off(room))
+            
+            room_header_layout.addWidget(room_on_btn)
+            room_header_layout.addWidget(room_off_btn)
+            
+            light_list_layout.addLayout(room_header_layout)
+            
+            # Room devices
+            room_layout = QVBoxLayout()
+            room_layout.setSpacing(2)
+            room_layout.setContentsMargins(10, 0, 0, 0)
+            
+            for i, device_idx in enumerate(device_indices):
+                # Create horizontal layout for each device
+                device_row = QHBoxLayout()
+                device_row.setSpacing(8)
+                
+                # Determine device type and global number
+                device_type = self.device_types.get(device_idx, "L")
+                if device_type == "TV":
+                    global_label = f"TV{device_idx-16}"  # TV1, TV2
+                elif device_type == "AC":
+                    global_label = f"AC{device_idx-18}"  # AC1, AC2, AC3
+                else:
+                    global_label = f"L{device_idx+1}"
+                
+                # Create label for the device with both global and local numbering
+                label = QLabel(f"{global_label} ({i+1}):")
+                label.setStyleSheet("""
+                    font-size: 11px;
+                    color: #cccccc;
+                    font-weight: bold;
+                    min-width: 50px;
+                """)
+                label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+                
+                # Set the label in our list
+                self.light_labels[device_idx] = label
+                
+                # Add label and button to row
+                device_row.addWidget(label)
+                device_row.addWidget(self.light_buttons[device_idx])
+                device_row.addStretch()  # Push content to left
+                
+                # Add row to room layout
+                room_layout.addLayout(device_row)
+            
+            # Add room layout to main layout
+            light_list_layout.addLayout(room_layout)
         
         light_layout.addLayout(light_list_layout)
         
@@ -498,7 +603,25 @@ class HomeViewerApp(QMainWindow):
         # Update status
         if hasattr(self, 'status_label'):
             state = "ON" if self.light_states[light_index] else "OFF"
-            self.status_label.setText(f"Light {light_index + 1} turned {state}")
+            # Find which room this device belongs to
+            room_name = "Unknown"
+            local_num = 1
+            for room, devices in self.room_layout.items():
+                if light_index in devices:
+                    room_name = room
+                    local_num = devices.index(light_index) + 1
+                    break
+            
+            # Determine device type and global label
+            device_type = self.device_types.get(light_index, "L")
+            if device_type == "TV":
+                global_label = f"TV{light_index-16}"
+            elif device_type == "AC":
+                global_label = f"AC{light_index-18}"
+            else:
+                global_label = f"L{light_index+1}"
+            
+            self.status_label.setText(f"{room_name} - {global_label} ({local_num}) turned {state}")
     
     def update_light_button(self, light_index):
         """Update the visual appearance of a light button and its label."""
@@ -509,47 +632,70 @@ class HomeViewerApp(QMainWindow):
         button.setChecked(self.light_states[light_index])
         button.setStyleSheet(self.get_light_button_style(self.light_states[light_index]))
         
-        # Update label color based on light state
-        if self.light_states[light_index]:
-            label.setStyleSheet("""
-                font-size: 12px;
-                color: #4CAF50;
-                font-weight: bold;
-                min-width: 30px;
-            """)
-        else:
-            label.setStyleSheet("""
-                font-size: 12px;
-                color: #ffffff;
-                font-weight: bold;
-                min-width: 30px;
-            """)
+        # Update label color based on light state (if label exists)
+        if label is not None:
+            if self.light_states[light_index]:
+                label.setStyleSheet("""
+                    font-size: 11px;
+                    color: #4CAF50;
+                    font-weight: bold;
+                    min-width: 30px;
+                """)
+            else:
+                label.setStyleSheet("""
+                    font-size: 11px;
+                    color: #cccccc;
+                    font-weight: bold;
+                    min-width: 30px;
+                """)
     
     def update_light_status(self):
-        """Update the light status counter."""
+        """Update the device status counter."""
         if hasattr(self, 'light_status'):
             on_count = sum(self.light_states)
-            self.light_status.setText(f"{on_count}/17 ON")
+            self.light_status.setText(f"{on_count}/22 ON")
     
     def all_lights_on(self):
-        """Turn all lights on."""
-        for i in range(17):
+        """Turn all devices on."""
+        for i in range(22):
             self.light_states[i] = True
             self.update_light_button(i)
         
         self.update_light_status()
         if hasattr(self, 'status_label'):
-            self.status_label.setText("All lights turned ON")
+            self.status_label.setText("All devices turned ON")
     
     def all_lights_off(self):
-        """Turn all lights off."""
-        for i in range(17):
+        """Turn all devices off."""
+        for i in range(22):
             self.light_states[i] = False
             self.update_light_button(i)
         
         self.update_light_status()
         if hasattr(self, 'status_label'):
-            self.status_label.setText("All lights turned OFF")
+            self.status_label.setText("All devices turned OFF")
+    
+    def room_lights_on(self, room_name):
+        """Turn on all devices in a specific room."""
+        if room_name in self.room_layout:
+            for device_idx in self.room_layout[room_name]:
+                self.light_states[device_idx] = True
+                self.update_light_button(device_idx)
+            
+            self.update_light_status()
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"All devices in {room_name} turned ON")
+    
+    def room_lights_off(self, room_name):
+        """Turn off all devices in a specific room."""
+        if room_name in self.room_layout:
+            for device_idx in self.room_layout[room_name]:
+                self.light_states[device_idx] = False
+                self.update_light_button(device_idx)
+            
+            self.update_light_status()
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"All devices in {room_name} turned OFF")
     
     def toggle_scene(self):
         """Toggle between different light scenes."""
@@ -565,24 +711,24 @@ class HomeViewerApp(QMainWindow):
         ]
         
         if self.current_scene == 0:  # Evening - All on
-            for i in range(17):
+            for i in range(22):
                 self.light_states[i] = True
         elif self.current_scene == 1:  # Night - Every other
-            for i in range(17):
+            for i in range(22):
                 self.light_states[i] = (i % 2 == 0)
         elif self.current_scene == 2:  # Party - Random pattern
             import random
-            for i in range(17):
+            for i in range(22):
                 self.light_states[i] = random.choice([True, False])
         elif self.current_scene == 3:  # Work - First 8
-            for i in range(17):
+            for i in range(22):
                 self.light_states[i] = (i < 8)
         elif self.current_scene == 4:  # Relax - Last 8
-            for i in range(17):
+            for i in range(22):
                 self.light_states[i] = (i >= 9)
         
         # Update all buttons
-        for i in range(17):
+        for i in range(22):
             self.update_light_button(i)
         
         self.update_light_status()
