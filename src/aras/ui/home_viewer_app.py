@@ -6,7 +6,8 @@ import sys
 import os
 import math
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy, QTabWidget)
+                            QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy, QTabWidget,
+                            QDialog, QVBoxLayout, QHBoxLayout, QCheckBox, QSpinBox, QComboBox, QGroupBox)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
@@ -168,6 +169,33 @@ class HomeViewerApp(QMainWindow):
         instructions = QLabel("Press 3 for 3D, 2 for 2D, R to reset, ESC to close")
         instructions.setStyleSheet("font-size: 12px; color: gray; padding: 10px;")
         switcher_layout.addWidget(instructions)
+        
+        # Settings button
+        self.settings_button = QPushButton("⚙")
+        self.settings_button.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 18px;
+                padding: 4px;
+                border: none;
+                border-radius: 3px;
+                min-width: 24px;
+                min-height: 24px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #4CAF50;
+            }
+            QPushButton:pressed {
+                background: rgba(255, 255, 255, 0.2);
+                color: #66BB6A;
+            }
+        """)
+        self.settings_button.setToolTip("Settings")
+        self.settings_button.clicked.connect(self.open_settings)
+        switcher_layout.addWidget(self.settings_button)
         
         parent_layout.addLayout(switcher_layout)
     
@@ -1390,6 +1418,252 @@ class HomeViewerApp(QMainWindow):
             self.viewer_3d.timer.stop()
         
         event.accept()
+    
+    def open_settings(self):
+        """Open the settings dialog."""
+        settings_dialog = SettingsDialog(self)
+        settings_dialog.exec()
+
+
+class SettingsDialog(QDialog):
+    """Settings dialog for the home viewer application."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle("Settings")
+        self.setModal(True)
+        self.resize(400, 300)
+        
+        # Set window flags for frameless window
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        
+        self.init_ui()
+    
+    def init_ui(self):
+        """Initialize the settings dialog UI."""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        # Title
+        title = QLabel("Settings")
+        title.setStyleSheet("""
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            padding: 10px 0px;
+        """)
+        layout.addWidget(title)
+        
+        # View Settings Group
+        view_group = QGroupBox("View Settings")
+        view_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                color: #cccccc;
+                border: 2px solid #666666;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        view_layout = QVBoxLayout(view_group)
+        
+        # Sync views checkbox
+        self.sync_views_cb = QCheckBox("Synchronize 3D and 2D views")
+        self.sync_views_cb.setChecked(self.parent.sync_views)
+        self.sync_views_cb.setStyleSheet("""
+            QCheckBox {
+                color: #ffffff;
+                font-size: 14px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+            }
+        """)
+        view_layout.addWidget(self.sync_views_cb)
+        
+        # Default view selection
+        default_view_layout = QHBoxLayout()
+        default_view_layout.addWidget(QLabel("Default View:"))
+        self.default_view_combo = QComboBox()
+        self.default_view_combo.addItems(["3D View", "2D View"])
+        self.default_view_combo.setCurrentText("3D View" if self.parent.current_view == "3d" else "2D View")
+        self.default_view_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #444444;
+                color: #ffffff;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 100px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #ffffff;
+                margin-right: 5px;
+            }
+        """)
+        default_view_layout.addWidget(self.default_view_combo)
+        default_view_layout.addStretch()
+        view_layout.addLayout(default_view_layout)
+        
+        layout.addWidget(view_group)
+        
+        # Display Settings Group
+        display_group = QGroupBox("Display Settings")
+        display_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                color: #cccccc;
+                border: 2px solid #666666;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        display_layout = QVBoxLayout(display_group)
+        
+        # Window size settings
+        size_layout = QHBoxLayout()
+        size_layout.addWidget(QLabel("Window Size:"))
+        self.width_spin = QSpinBox()
+        self.width_spin.setRange(800, 2000)
+        self.width_spin.setValue(self.parent.width())
+        self.width_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #444444;
+                color: #ffffff;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 80px;
+            }
+        """)
+        size_layout.addWidget(self.width_spin)
+        size_layout.addWidget(QLabel("x"))
+        self.height_spin = QSpinBox()
+        self.height_spin.setRange(600, 1500)
+        self.height_spin.setValue(self.parent.height())
+        self.height_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #444444;
+                color: #ffffff;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 80px;
+            }
+        """)
+        size_layout.addWidget(self.height_spin)
+        size_layout.addStretch()
+        display_layout.addLayout(size_layout)
+        
+        layout.addWidget(display_group)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # Apply button
+        apply_btn = QPushButton("Apply")
+        apply_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #4CAF50, stop:1 #45a049);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 6px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #5CBF60, stop:1 #55b059);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #3d8b40, stop:1 #357a38);
+            }
+        """)
+        apply_btn.clicked.connect(self.apply_settings)
+        button_layout.addWidget(apply_btn)
+        
+        # Cancel button
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #666666, stop:1 #444444);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 8px 20px;
+                border: 1px solid #777777;
+                border-radius: 6px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #777777, stop:1 #555555);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #555555, stop:1 #333333);
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_btn)
+        
+        layout.addLayout(button_layout)
+        
+        # Set dialog background
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #2b2b2b;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+        """)
+    
+    def apply_settings(self):
+        """Apply the settings and close the dialog."""
+        # Apply sync views setting
+        self.parent.sync_views = self.sync_views_cb.isChecked()
+        
+        # Apply default view setting
+        if self.default_view_combo.currentText() == "3D View":
+            self.parent.current_view = "3d"
+        else:
+            self.parent.current_view = "2d"
+        
+        # Apply window size setting
+        new_width = self.width_spin.value()
+        new_height = self.height_spin.value()
+        self.parent.resize(new_width, new_height)
+        
+        # Close dialog
+        self.accept()
 
 
 def main():
