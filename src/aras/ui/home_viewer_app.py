@@ -6,7 +6,7 @@ import sys
 import os
 import math
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QLabel, QStatusBar)
+                            QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
@@ -44,6 +44,9 @@ class HomeViewerApp(QMainWindow):
         # State
         self.sync_views = True
         self.current_room = None
+        
+        # Light states
+        self.light_states = [False] * 17  # 17 lights, all initially off
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -56,6 +59,13 @@ class HomeViewerApp(QMainWindow):
         
         # Create view switcher
         self.create_view_switcher(main_layout)
+        
+        # Create light control panel (centered, not full width)
+        light_panel_container = QHBoxLayout()
+        light_panel_container.addStretch()
+        self.create_light_panel(light_panel_container)
+        light_panel_container.addStretch()
+        main_layout.addLayout(light_panel_container)
         
         # Create stacked widget for views
         self.stacked_widget = QWidget()
@@ -91,6 +101,212 @@ class HomeViewerApp(QMainWindow):
         switcher_layout.addWidget(instructions)
         
         parent_layout.addLayout(switcher_layout)
+    
+    def create_light_panel(self, parent_layout):
+        """Create the modern light control panel with 17 light buttons."""
+        light_panel = QWidget()
+        light_panel.setMaximumWidth(600)  # Limit the panel width
+        light_panel.setStyleSheet("""
+            QWidget {
+                background-color: #2b2b2b;
+                border-radius: 10px;
+                margin: 5px;
+            }
+        """)
+        light_layout = QVBoxLayout(light_panel)
+        light_layout.setSpacing(8)
+        light_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Modern light panel header
+        header_layout = QHBoxLayout()
+        
+        light_title = QLabel("Lights")
+        light_title.setStyleSheet("""
+            font-size: 14px; 
+            font-weight: bold; 
+            color: #ffffff;
+            padding: 2px;
+        """)
+        header_layout.addWidget(light_title)
+        
+        # Light status indicator
+        self.light_status = QLabel("0/17 ON")
+        self.light_status.setStyleSheet("""
+            font-size: 12px; 
+            color: #888888;
+            padding: 2px;
+        """)
+        header_layout.addStretch()
+        header_layout.addWidget(self.light_status)
+        
+        light_layout.addLayout(header_layout)
+        
+        # Create compact grid for light buttons with labels
+        button_grid = QGridLayout()
+        button_grid.setSpacing(0)
+        
+        # Create 17 compact light buttons with labels
+        self.light_buttons = []
+        self.light_labels = []
+        for i in range(17):
+            # Create label for the light
+            label = QLabel(f"L{i+1}")
+            label.setStyleSheet("""
+                font-size: 9px;
+                color: #aaaaaa;
+                font-weight: bold;
+                text-align: center;
+            """)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            # Create button
+            btn = QPushButton()
+            btn.setMinimumSize(50, 30)
+            btn.setMaximumSize(50, 30)
+            btn.setText("OFF")
+            btn.setCheckable(True)
+            btn.setStyleSheet(self.get_light_button_style(False))
+            btn.clicked.connect(lambda checked, idx=i: self.toggle_light(idx))
+            
+            self.light_buttons.append(btn)
+            self.light_labels.append(label)
+            
+            # Position in grid (6 columns for more compact layout)
+            row = (i // 6) * 2  # Double row spacing for label + button
+            col = i % 6
+            
+            # Add label and button to grid
+            button_grid.addWidget(label, row, col)
+            button_grid.addWidget(btn, row + 1, col)
+        
+        light_layout.addLayout(button_grid)
+        
+        # Compact control buttons
+        control_layout = QHBoxLayout()
+        control_layout.setSpacing(6)
+        
+        all_on_btn = QPushButton("On")
+        all_on_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #4CAF50, stop:1 #45a049);
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 2px 4px;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #5CBF60, stop:1 #4CAF50);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #45a049, stop:1 #3d8b40);
+            }
+        """)
+        all_on_btn.clicked.connect(self.all_lights_on)
+        control_layout.addWidget(all_on_btn)
+        
+        all_off_btn = QPushButton("Off")
+        all_off_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #f44336, stop:1 #d32f2f);
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 2px 4px;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #f55555, stop:1 #f44336);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #d32f2f, stop:1 #b71c1c);
+            }
+        """)
+        all_off_btn.clicked.connect(self.all_lights_off)
+        control_layout.addWidget(all_off_btn)
+        
+        # Scene button
+        scene_btn = QPushButton("Scene")
+        scene_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #9C27B0, stop:1 #7B1FA2);
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 2px 4px;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #AB47BC, stop:1 #9C27B0);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #7B1FA2, stop:1 #6A1B9A);
+            }
+        """)
+        scene_btn.clicked.connect(self.toggle_scene)
+        control_layout.addWidget(scene_btn)
+        
+        light_layout.addLayout(control_layout)
+        
+        parent_layout.addWidget(light_panel)
+    
+    def get_light_button_style(self, is_on):
+        """Get the toggle button style for light buttons."""
+        if is_on:
+            return """
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #4CAF50, stop:1 #45a049);
+                    color: white;
+                    font-weight: bold;
+                    font-size: 10px;
+                    border: 2px solid #4CAF50;
+                    border-radius: 8px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #5CBF60, stop:1 #4CAF50);
+                    border: 2px solid #5CBF60;
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #45a049, stop:1 #3d8b40);
+                }
+            """
+        else:
+            return """
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #666666, stop:1 #444444);
+                    color: #cccccc;
+                    font-weight: bold;
+                    font-size: 10px;
+                    border: 2px solid #666666;
+                    border-radius: 8px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #777777, stop:1 #555555);
+                    color: #dddddd;
+                    border: 2px solid #777777;
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #555555, stop:1 #333333);
+                }
+            """
     
     def create_3d_panel(self):
         """Create the 3D viewer panel."""
@@ -248,6 +464,107 @@ class HomeViewerApp(QMainWindow):
         if hasattr(self, 'status_label'):
             self.status_label.setText(f"View sync: {'ON' if self.sync_views else 'OFF'}")
     
+    def toggle_light(self, light_index):
+        """Toggle a specific light on/off."""
+        self.light_states[light_index] = not self.light_states[light_index]
+        self.update_light_button(light_index)
+        self.update_light_status()
+        
+        # Update status
+        if hasattr(self, 'status_label'):
+            state = "ON" if self.light_states[light_index] else "OFF"
+            self.status_label.setText(f"Light {light_index + 1} turned {state}")
+    
+    def update_light_button(self, light_index):
+        """Update the visual appearance of a light button and its label."""
+        button = self.light_buttons[light_index]
+        label = self.light_labels[light_index]
+        
+        button.setText("ON" if self.light_states[light_index] else "OFF")
+        button.setChecked(self.light_states[light_index])
+        button.setStyleSheet(self.get_light_button_style(self.light_states[light_index]))
+        
+        # Update label color based on light state
+        if self.light_states[light_index]:
+            label.setStyleSheet("""
+                font-size: 9px;
+                color: #4CAF50;
+                font-weight: bold;
+                text-align: center;
+            """)
+        else:
+            label.setStyleSheet("""
+                font-size: 9px;
+                color: #aaaaaa;
+                font-weight: bold;
+                text-align: center;
+            """)
+    
+    def update_light_status(self):
+        """Update the light status counter."""
+        if hasattr(self, 'light_status'):
+            on_count = sum(self.light_states)
+            self.light_status.setText(f"{on_count}/17 ON")
+    
+    def all_lights_on(self):
+        """Turn all lights on."""
+        for i in range(17):
+            self.light_states[i] = True
+            self.update_light_button(i)
+        
+        self.update_light_status()
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("All lights turned ON")
+    
+    def all_lights_off(self):
+        """Turn all lights off."""
+        for i in range(17):
+            self.light_states[i] = False
+            self.update_light_button(i)
+        
+        self.update_light_status()
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("All lights turned OFF")
+    
+    def toggle_scene(self):
+        """Toggle between different light scenes."""
+        if not hasattr(self, 'current_scene'):
+            self.current_scene = 0
+        
+        scenes = [
+            "Evening",    # Scene 0: All lights on
+            "Night",      # Scene 1: Every other light
+            "Party",      # Scene 2: Random pattern
+            "Work",       # Scene 3: First 8 lights
+            "Relax"       # Scene 4: Last 8 lights
+        ]
+        
+        if self.current_scene == 0:  # Evening - All on
+            for i in range(17):
+                self.light_states[i] = True
+        elif self.current_scene == 1:  # Night - Every other
+            for i in range(17):
+                self.light_states[i] = (i % 2 == 0)
+        elif self.current_scene == 2:  # Party - Random pattern
+            import random
+            for i in range(17):
+                self.light_states[i] = random.choice([True, False])
+        elif self.current_scene == 3:  # Work - First 8
+            for i in range(17):
+                self.light_states[i] = (i < 8)
+        elif self.current_scene == 4:  # Relax - Last 8
+            for i in range(17):
+                self.light_states[i] = (i >= 9)
+        
+        # Update all buttons
+        for i in range(17):
+            self.update_light_button(i)
+        
+        self.update_light_status()
+        self.current_scene = (self.current_scene + 1) % len(scenes)
+        
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(f"Scene: {scenes[self.current_scene - 1] if self.current_scene > 0 else scenes[-1]}")
     
     def closeEvent(self, event):
         """Handle application close."""
