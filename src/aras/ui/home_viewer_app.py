@@ -6,7 +6,7 @@ import sys
 import os
 import math
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy)
+                            QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy, QTabWidget)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
@@ -53,6 +53,11 @@ class HomeViewerApp(QMainWindow):
         """Initialize the user interface."""
         # Central widget
         central_widget = QWidget()
+        central_widget.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+            }
+        """)
         self.setCentralWidget(central_widget)
         
         # Main layout - horizontal split
@@ -60,6 +65,11 @@ class HomeViewerApp(QMainWindow):
         
         # Left side - Viewer (50% of width)
         left_panel = QWidget()
+        left_panel.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+            }
+        """)
         left_layout = QVBoxLayout(left_panel)
         
         # Create view switcher
@@ -72,13 +82,18 @@ class HomeViewerApp(QMainWindow):
         
         # Right side - Controls (50% of width)
         right_panel = QWidget()
+        right_panel.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+            }
+        """)
         right_layout = QVBoxLayout(right_panel)
         
-        # Create light control panel at the top
-        self.create_light_panel(right_layout)
+        # Initialize device controls
+        self.initialize_device_controls()
         
-        # Add stretch to push panel to top
-        right_layout.addStretch()
+        # Create tabbed interface
+        self.create_tabbed_interface(right_layout)
         
         # Add panels to main layout with equal stretch
         main_layout.addWidget(left_panel, 1)  # 50% width
@@ -95,6 +110,44 @@ class HomeViewerApp(QMainWindow):
         
         # Load initial model after UI is ready
         QTimer.singleShot(100, self.load_home_model)
+    
+    def initialize_device_controls(self):
+        """Initialize device controls and room layout."""
+        # Define room layout with device assignments
+        self.room_layout = {
+            "Bedroom 1": [0, 1, 2, 19],  # L1, L2, L3, AC1
+            "Bedroom 2": [3, 4, 5],      # L4, L5, L6
+            "Bedroom 3": [6, 7, 8, 17, 20],  # L7, L8, L9, TV1, AC2
+            "Kitchen": [9, 10],          # L10, L11
+            "Living Room": [11, 12, 13, 18, 21], # L12, L13, L14, TV2, AC3
+            "Bathroom": [14],            # L15
+            "Outside": [15, 16]          # L16, L17
+        }
+        
+        # Device type mapping
+        self.device_types = {
+            17: "TV",   # TV1 in Bedroom 3
+            18: "TV",   # TV2 in Living Room
+            19: "AC",   # AC1 in Bedroom 1
+            20: "AC",   # AC2 in Bedroom 3
+            21: "AC"    # AC3 in Living Room
+        }
+        
+        # Create 22 device controls (17 lights + 2 TVs + 3 ACs)
+        self.light_buttons = []
+        self.light_labels = []
+        for i in range(22):
+            # Create button
+            btn = QPushButton()
+            btn.setMinimumSize(60, 25)
+            btn.setMaximumSize(60, 25)
+            btn.setText("OFF")
+            btn.setCheckable(True)
+            btn.setStyleSheet(self.get_light_button_style(False))
+            btn.clicked.connect(lambda checked, idx=i: self.toggle_light(idx))
+            
+            self.light_buttons.append(btn)
+            self.light_labels.append(None)  # Will be set per room
     
     def create_view_switcher(self, parent_layout):
         """Create the view switcher (status only)."""
@@ -114,7 +167,7 @@ class HomeViewerApp(QMainWindow):
         
         parent_layout.addLayout(switcher_layout)
     
-    def create_light_panel(self, parent_layout):
+    def create_light_panel_old(self, parent_layout):
         """Create the modern light control panel with 17 light buttons."""
         light_panel = QWidget()
         light_panel.setStyleSheet("""
@@ -207,33 +260,6 @@ class HomeViewerApp(QMainWindow):
         """)
         all_off_btn.clicked.connect(self.all_lights_off)
         control_layout.addWidget(all_off_btn)
-        
-        # Scene button
-        scene_btn = QPushButton("Scene")
-        scene_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        scene_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #666666, stop:1 #444444);
-                color: #ffffff;
-                font-weight: bold;
-                font-size: 12px;
-                padding: 2px 4px;
-                border: 1px solid #777777;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #777777, stop:1 #555555);
-                border: 1px solid #888888;
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #555555, stop:1 #333333);
-            }
-        """)
-        scene_btn.clicked.connect(self.toggle_scene)
-        control_layout.addWidget(scene_btn)
         
         # Add control buttons to header layout
         header_layout.addLayout(control_layout)
@@ -374,8 +400,8 @@ class HomeViewerApp(QMainWindow):
                 
                 # Set the label in our list
                 self.light_labels[device_idx] = label
-                
-                # Add label and button to row
+            
+            # Add label and button to row
                 device_row.addWidget(label)
                 device_row.addWidget(self.light_buttons[device_idx])
                 device_row.addStretch()  # Push content to left
@@ -389,6 +415,295 @@ class HomeViewerApp(QMainWindow):
         light_layout.addLayout(light_list_layout)
         
         parent_layout.addWidget(light_panel)
+    
+    def create_tabbed_interface(self, parent_layout):
+        """Create the tabbed interface organized by rooms."""
+        # Create tab widget
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: none;
+                background-color: transparent;
+            }
+            QTabBar::tab {
+                background-color: rgba(60, 60, 60, 0.7);
+                color: #cccccc;
+                padding: 4px 8px;
+                margin-right: 1px;
+                border-top-left-radius: 3px;
+                border-top-right-radius: 3px;
+                min-width: 60px;
+                font-size: 11px;
+                font-weight: normal;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            QTabBar::tab:selected {
+                background-color: rgba(76, 175, 80, 0.8);
+                color: #ffffff;
+                font-weight: bold;
+                border: 1px solid rgba(76, 175, 80, 0.6);
+            }
+            QTabBar::tab:hover {
+                background-color: rgba(74, 74, 74, 0.8);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            QTabBar::tab:!selected {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        """)
+        
+        # Create room-based tabs
+        self.create_overview_tab()
+        self.create_room_tab("Bedroom 1", [0, 1, 2, 19])  # L1, L2, L3, AC1
+        self.create_room_tab("Bedroom 2", [3, 4, 5])      # L4, L5, L6
+        self.create_room_tab("Bedroom 3", [6, 7, 8, 17, 20])  # L7, L8, L9, TV1, AC2
+        self.create_room_tab("Kitchen", [9, 10])          # L10, L11
+        self.create_room_tab("Living Room", [11, 12, 13, 18, 21]) # L12, L13, L14, TV2, AC3
+        self.create_room_tab("Bathroom", [14])            # L15
+        self.create_room_tab("Outside", [15, 16])         # L16, L17
+        
+        parent_layout.addWidget(self.tab_widget)
+    
+    def create_overview_tab(self):
+        """Create the overview tab with all devices and global controls."""
+        overview_tab = QWidget()
+        overview_tab.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+            }
+        """)
+        overview_layout = QVBoxLayout(overview_tab)
+        overview_layout.setContentsMargins(8, 8, 8, 8)
+        overview_layout.setSpacing(6)
+        
+        # Overview header
+        overview_header = QLabel("Home Overview")
+        overview_header.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #4CAF50;
+            padding: 6px 0px;
+        """)
+        overview_layout.addWidget(overview_header)
+        
+        # Global controls
+        global_controls_layout = QHBoxLayout()
+        global_controls_layout.setSpacing(8)
+        
+        # All devices on/off
+        all_on_btn = QPushButton("All ON")
+        all_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        all_on_btn.setStyleSheet(self.get_scene_button_style())
+        all_on_btn.clicked.connect(self.all_lights_on)
+        global_controls_layout.addWidget(all_on_btn)
+        
+        all_off_btn = QPushButton("All OFF")
+        all_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        all_off_btn.setStyleSheet(self.get_scene_button_style())
+        all_off_btn.clicked.connect(self.all_lights_off)
+        global_controls_layout.addWidget(all_off_btn)
+        
+        # Device status
+        self.device_count_label = QLabel("0/22 devices ON")
+        self.device_count_label.setStyleSheet("""
+            font-size: 14px;
+            color: #cccccc;
+            padding: 5px 0px;
+        """)
+        global_controls_layout.addWidget(self.device_count_label)
+        global_controls_layout.addStretch()
+        
+        overview_layout.addLayout(global_controls_layout)
+        
+        # Scene controls
+        scenes_header = QLabel("Light Scenes")
+        scenes_header.setStyleSheet("""
+            font-size: 14px;
+            font-weight: bold;
+            color: #4CAF50;
+            padding: 10px 0px 4px 0px;
+        """)
+        overview_layout.addWidget(scenes_header)
+        
+        # Scene buttons in a grid
+        scene_grid = QGridLayout()
+        scene_grid.setSpacing(6)
+        
+        scenes = [
+            ("Evening", 0), ("Night", 1), ("Party", 2),
+            ("Work", 3), ("Relax", 4)
+        ]
+        
+        for i, (name, index) in enumerate(scenes):
+            btn = QPushButton(f"{name} Scene")
+            btn.setStyleSheet(self.get_scene_button_style())
+            btn.clicked.connect(lambda checked, idx=index: self.apply_scene(idx))
+            scene_grid.addWidget(btn, i // 3, i % 3)
+        
+        overview_layout.addLayout(scene_grid)
+        overview_layout.addStretch()
+        
+        self.tab_widget.addTab(overview_tab, "Overview")
+    
+    def create_room_tab(self, room_name, device_indices):
+        """Create a tab for a specific room with its devices."""
+        room_tab = QWidget()
+        room_tab.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+            }
+        """)
+        room_layout = QVBoxLayout(room_tab)
+        room_layout.setContentsMargins(8, 8, 8, 8)
+        room_layout.setSpacing(6)
+        
+        # Room header
+        room_header = QLabel(room_name)
+        room_header.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #4CAF50;
+            padding: 6px 0px;
+        """)
+        room_layout.addWidget(room_header)
+        
+        # Room controls
+        room_controls_layout = QHBoxLayout()
+        room_controls_layout.setSpacing(8)
+        
+        # Room on/off buttons
+        room_on_btn = QPushButton("Room ON")
+        room_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        room_on_btn.setStyleSheet(self.get_scene_button_style())
+        room_on_btn.clicked.connect(lambda: self.room_lights_on(room_name))
+        room_controls_layout.addWidget(room_on_btn)
+        
+        room_off_btn = QPushButton("Room OFF")
+        room_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        room_off_btn.setStyleSheet(self.get_scene_button_style())
+        room_off_btn.clicked.connect(lambda: self.room_lights_off(room_name))
+        room_controls_layout.addWidget(room_off_btn)
+        
+        # Room device count
+        room_device_count = len(device_indices)
+        room_status_label = QLabel(f"{room_device_count} devices in this room")
+        room_status_label.setStyleSheet("""
+            font-size: 12px;
+            color: #cccccc;
+            padding: 5px 0px;
+        """)
+        room_controls_layout.addWidget(room_status_label)
+        room_controls_layout.addStretch()
+        
+        room_layout.addLayout(room_controls_layout)
+        
+        # Room devices
+        devices_header = QLabel("Devices")
+        devices_header.setStyleSheet("""
+            font-size: 12px;
+            font-weight: bold;
+            color: #ffffff;
+            padding: 10px 0px 4px 0px;
+        """)
+        room_layout.addWidget(devices_header)
+        
+        # Create device controls for this room
+        for i, device_idx in enumerate(device_indices):
+            device_row = QHBoxLayout()
+            device_row.setSpacing(8)
+            
+            # Determine device type and global number
+            device_type = self.device_types.get(device_idx, "L")
+            if device_type == "TV":
+                global_label = f"TV{device_idx-16}"
+            elif device_type == "AC":
+                global_label = f"AC{device_idx-18}"
+            else:
+                global_label = f"L{device_idx+1}"
+            
+            # Device label
+            device_label = QLabel(f"{global_label} ({i+1}):")
+            device_label.setStyleSheet("""
+                font-size: 12px;
+                color: #cccccc;
+                font-weight: bold;
+                min-width: 60px;
+            """)
+            device_row.addWidget(device_label)
+            
+            # Device button
+            device_btn = self.light_buttons[device_idx]
+            device_row.addWidget(device_btn)
+            device_row.addStretch()
+            
+            room_layout.addLayout(device_row)
+        
+        room_layout.addStretch()
+        self.tab_widget.addTab(room_tab, room_name)
+    
+    def get_scene_button_style(self):
+        """Get the style for scene buttons."""
+        return """
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #4CAF50, stop:1 #45a049);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 8px 16px;
+                border: 1px solid #4CAF50;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #5CBF60, stop:1 #4CAF50);
+                border: 1px solid #5CBF60;
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #45a049, stop:1 #3d8b40);
+            }
+        """
+    
+    def apply_scene(self, scene_index):
+        """Apply a specific scene."""
+        if not hasattr(self, 'current_scene'):
+            self.current_scene = 0
+        
+        scenes = [
+            "Evening",    # Scene 0: All lights on
+            "Night",      # Scene 1: Every other light
+            "Party",      # Scene 2: Random pattern
+            "Work",       # Scene 3: First 8 lights
+            "Relax"       # Scene 4: Last 8 lights
+        ]
+        
+        if scene_index == 0:  # Evening - All on
+            for i in range(22):
+                self.light_states[i] = True
+        elif scene_index == 1:  # Night - Every other
+            for i in range(22):
+                self.light_states[i] = (i % 2 == 0)
+        elif scene_index == 2:  # Party - Random pattern
+            import random
+            for i in range(22):
+                self.light_states[i] = random.choice([True, False])
+        elif scene_index == 3:  # Work - First 8
+            for i in range(22):
+                self.light_states[i] = (i < 8)
+        elif scene_index == 4:  # Relax - Last 8
+            for i in range(22):
+                self.light_states[i] = (i >= 9)
+        
+        # Update all buttons
+        for i in range(22):
+            self.update_light_button(i)
+        
+        self.update_light_status()
+        
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(f"Applied {scenes[scene_index]} scene")
     
     def get_light_button_style(self, is_on):
         """Get the toggle button style for light buttons."""
@@ -651,9 +966,13 @@ class HomeViewerApp(QMainWindow):
     
     def update_light_status(self):
         """Update the device status counter."""
+        on_count = sum(self.light_states)
+        
         if hasattr(self, 'light_status'):
-            on_count = sum(self.light_states)
             self.light_status.setText(f"{on_count}/22 ON")
+        
+        if hasattr(self, 'device_count_label'):
+            self.device_count_label.setText(f"{on_count}/22 devices ON")
     
     def all_lights_on(self):
         """Turn all devices on."""
