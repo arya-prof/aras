@@ -44,6 +44,10 @@ class Home3DViewer(QOpenGLWidget):
         # Mouse interaction
         self.last_mouse_pos = None
         self.mouse_pressed = False
+        self.user_interacting = False
+        self.interaction_timer = QTimer()
+        self.interaction_timer.timeout.connect(self.resume_auto_rotation)
+        self.interaction_timer.setSingleShot(True)
         
         # 3D model data
         self.vertices = []
@@ -62,7 +66,7 @@ class Home3DViewer(QOpenGLWidget):
         
         # Animation
         self.rotation_angle = 0.0
-        self.auto_rotate = False
+        self.auto_rotate = True  # Enable auto-rotation by default to preview whole model
         
         # Load the model
         self.load_home_model()
@@ -467,6 +471,8 @@ class Home3DViewer(QOpenGLWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.mouse_pressed = True
             self.last_mouse_pos = event.position()
+            self.user_interacting = True
+            self.interaction_timer.stop()  # Stop the resume timer
     
     def mouseMoveEvent(self, event: QMouseEvent):
         """Handle mouse move events."""
@@ -487,6 +493,8 @@ class Home3DViewer(QOpenGLWidget):
         """Handle mouse release events."""
         if event.button() == Qt.MouseButton.LeftButton:
             self.mouse_pressed = False
+            # Resume auto-rotation after 2 seconds of no interaction
+            self.interaction_timer.start(2000)
     
     def wheelEvent(self, event: QWheelEvent):
         """Handle wheel events for zooming."""
@@ -494,6 +502,9 @@ class Home3DViewer(QOpenGLWidget):
         zoom_factor = 1.1 if delta > 0 else 0.9
         self.camera_distance *= zoom_factor
         self.camera_distance = max(1.0, min(50.0, self.camera_distance))
+        self.user_interacting = True
+        self.interaction_timer.stop()
+        self.interaction_timer.start(2000)  # Resume auto-rotation after 2 seconds
         self.update()
     
     def keyPressEvent(self, event: QKeyEvent):
@@ -523,9 +534,13 @@ class Home3DViewer(QOpenGLWidget):
     
     def update_rotation(self):
         """Update rotation for auto-rotate."""
-        if self.auto_rotate:
+        if self.auto_rotate and not self.user_interacting:
             self.rotation_angle += 0.01
             self.update()
+    
+    def resume_auto_rotation(self):
+        """Resume auto-rotation after user interaction ends."""
+        self.user_interacting = False
     
     def resizeGL(self, width, height):
         """Handle resize events."""
