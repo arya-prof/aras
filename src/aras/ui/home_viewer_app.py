@@ -7,7 +7,7 @@ import os
 import math
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QSplitter, QLabel, QPushButton, 
-                            QGroupBox, QSlider, QCheckBox, QStatusBar)
+                            QGroupBox, QSlider, QCheckBox, QStatusBar, QStackedWidget)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
@@ -39,18 +39,12 @@ class HomeViewerApp(QMainWindow):
         # Set frameless window
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         
-        # Add close button
-        self.add_close_button()
-        
         # Setup keyboard shortcuts
         self.setup_shortcuts()
         
         # State
         self.sync_views = True
         self.current_room = None
-        
-        # Load initial model
-        self.load_home_model()
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -59,33 +53,58 @@ class HomeViewerApp(QMainWindow):
         self.setCentralWidget(central_widget)
         
         # Main layout
-        main_layout = QHBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
         
-        # Create splitter for resizable panels
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(splitter)
+        # Create view switcher
+        self.create_view_switcher(main_layout)
         
-        # Left panel - 3D viewer
-        self.create_3d_panel(splitter)
+        # Create stacked widget for views
+        self.stacked_widget = QWidget()
+        self.stacked_layout = QHBoxLayout(self.stacked_widget)
+        main_layout.addWidget(self.stacked_widget)
         
-        # Right panel - 2D viewer and controls
-        self.create_2d_panel(splitter)
+        # Create 3D panel
+        self.create_3d_panel()
         
-        # Set splitter proportions
-        splitter.setSizes([700, 700])
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
+        # Create 2D panel
+        self.create_2d_panel()
+        
+        # Set initial view (but don't call show_3d_view yet)
+        self.current_view = "3d"
+        
+        # Load initial model after UI is ready
+        QTimer.singleShot(100, self.load_home_model)
     
-    def create_3d_panel(self, parent):
+    def create_view_switcher(self, parent_layout):
+        """Create the view switcher buttons."""
+        switcher_layout = QHBoxLayout()
+        
+        # 3D View button
+        self.btn_3d = QPushButton("3D View")
+        self.btn_3d.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; }")
+        self.btn_3d.clicked.connect(self.show_3d_view)
+        switcher_layout.addWidget(self.btn_3d)
+        
+        # 2D View button
+        self.btn_2d = QPushButton("2D View")
+        self.btn_2d.setStyleSheet("QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 8px; }")
+        self.btn_2d.clicked.connect(self.show_2d_view)
+        switcher_layout.addWidget(self.btn_2d)
+        
+        # Close button
+        self.btn_close = QPushButton("Close")
+        self.btn_close.setStyleSheet("QPushButton { background-color: #f44336; color: white; font-weight: bold; padding: 8px; }")
+        self.btn_close.clicked.connect(self.close)
+        switcher_layout.addWidget(self.btn_close)
+        
+        switcher_layout.addStretch()
+        parent_layout.addLayout(switcher_layout)
+    
+    def create_3d_panel(self):
         """Create the 3D viewer panel."""
         # 3D panel container
-        panel_3d = QWidget()
-        layout_3d = QVBoxLayout(panel_3d)
-        
-        # 3D viewer title
-        title_3d = QLabel("3D Home View")
-        title_3d.setStyleSheet("font-size: 16px; font-weight: bold; padding: 5px;")
-        layout_3d.addWidget(title_3d)
+        self.panel_3d = QWidget()
+        layout_3d = QVBoxLayout(self.panel_3d)
         
         # 3D viewer widget
         self.viewer_3d = Home3DViewer()
@@ -95,28 +114,45 @@ class HomeViewerApp(QMainWindow):
         controls_3d = self.create_3d_controls()
         layout_3d.addWidget(controls_3d)
         
-        parent.addWidget(panel_3d)
+        # Add to stacked layout
+        self.stacked_layout.addWidget(self.panel_3d)
     
-    def create_2d_panel(self, parent):
+    def create_2d_panel(self):
         """Create the 2D viewer panel."""
         # 2D panel container
-        panel_2d = QWidget()
-        layout_2d = QVBoxLayout(panel_2d)
-        
-        # 2D viewer title
-        title_2d = QLabel("2D Floor Plan")
-        title_2d.setStyleSheet("font-size: 16px; font-weight: bold; padding: 5px;")
-        layout_2d.addWidget(title_2d)
+        self.panel_2d = QWidget()
+        layout_2d = QVBoxLayout(self.panel_2d)
         
         # 2D viewer widget
         self.viewer_2d = Home2DViewer()
         layout_2d.addWidget(self.viewer_2d)
         
-        # 2D controls and info
+        # 2D controls
         controls_2d = self.create_2d_controls()
         layout_2d.addWidget(controls_2d)
         
-        parent.addWidget(panel_2d)
+        # Add to stacked layout
+        self.stacked_layout.addWidget(self.panel_2d)
+    
+    def show_3d_view(self):
+        """Show the 3D view."""
+        self.current_view = "3d"
+        self.panel_3d.setVisible(True)
+        self.panel_2d.setVisible(False)
+        self.btn_3d.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; }")
+        self.btn_2d.setStyleSheet("QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 8px; }")
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("3D View - Drag to rotate, wheel to zoom")
+    
+    def show_2d_view(self):
+        """Show the 2D view."""
+        self.current_view = "2d"
+        self.panel_3d.setVisible(False)
+        self.panel_2d.setVisible(True)
+        self.btn_3d.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; }")
+        self.btn_2d.setStyleSheet("QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 8px; }")
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("2D View - Click rooms, wheel to zoom")
     
     def create_3d_controls(self):
         """Create 3D viewer controls."""
@@ -247,21 +283,6 @@ class HomeViewerApp(QMainWindow):
         self.status_label = QLabel("Ready")
         self.status_bar.addWidget(self.status_label)
     
-    def add_close_button(self):
-        """Add a close button to the interface."""
-        # Add close button to the 3D controls
-        close_btn = QPushButton("Close")
-        close_btn.setStyleSheet("QPushButton { background-color: #ff4444; color: white; font-weight: bold; }")
-        close_btn.clicked.connect(self.close)
-        
-        # Add to 3D controls panel
-        if hasattr(self, 'viewer_3d'):
-            # Find the 3D controls group and add close button
-            for child in self.findChildren(QGroupBox):
-                if child.title() == "Model":
-                    layout = child.layout()
-                    layout.addWidget(close_btn)
-                    break
     
     def setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -277,6 +298,18 @@ class HomeViewerApp(QMainWindow):
         sync_action.triggered.connect(self.toggle_sync)
         self.addAction(sync_action)
         
+        # Switch to 3D view
+        view_3d_action = QAction("3D View", self)
+        view_3d_action.setShortcut("3")
+        view_3d_action.triggered.connect(self.show_3d_view)
+        self.addAction(view_3d_action)
+        
+        # Switch to 2D view
+        view_2d_action = QAction("2D View", self)
+        view_2d_action.setShortcut("2")
+        view_2d_action.triggered.connect(self.show_2d_view)
+        self.addAction(view_2d_action)
+        
         # Close application
         close_action = QAction("Close", self)
         close_action.setShortcut("Escape")
@@ -285,6 +318,9 @@ class HomeViewerApp(QMainWindow):
     
     def load_home_model(self):
         """Load the home model."""
+        # Show the initial view now that status bar is ready
+        self.show_3d_view()
+        
         self.status_label.setText("Loading home model...")
         
         # The model loading is handled in the 3D viewer constructor
@@ -293,7 +329,10 @@ class HomeViewerApp(QMainWindow):
     
     def on_model_loaded(self):
         """Called when model loading is complete."""
-        self.status_label.setText("Ready")
+        if self.current_view == "3d":
+            self.status_label.setText("3D View - Drag to rotate, wheel to zoom")
+        else:
+            self.status_label.setText("2D View - Click rooms, wheel to zoom")
     
     def update_3d_distance(self, value):
         """Update 3D camera distance."""
@@ -365,7 +404,10 @@ class HomeViewerApp(QMainWindow):
     def on_room_selected(self, room_name):
         """Handle room selection."""
         self.current_room = room_name
-        self.status_label.setText(f"Selected room: {room_name}")
+        if self.current_view == "2d":
+            self.status_label.setText(f"2D View - Selected room: {room_name}")
+        else:
+            self.status_label.setText(f"3D View - Selected room: {room_name}")
     
     
     def reset_all_views(self):
