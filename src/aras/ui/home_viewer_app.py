@@ -6,8 +6,7 @@ import sys
 import os
 import math
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QSplitter, QLabel, QPushButton, 
-                            QGroupBox, QSlider, QCheckBox, QStatusBar, QStackedWidget)
+                            QHBoxLayout, QLabel, QStatusBar)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
@@ -76,28 +75,21 @@ class HomeViewerApp(QMainWindow):
         QTimer.singleShot(100, self.load_home_model)
     
     def create_view_switcher(self, parent_layout):
-        """Create the view switcher buttons."""
+        """Create the view switcher (status only)."""
         switcher_layout = QHBoxLayout()
         
-        # 3D View button
-        self.btn_3d = QPushButton("3D View")
-        self.btn_3d.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; }")
-        self.btn_3d.clicked.connect(self.show_3d_view)
-        switcher_layout.addWidget(self.btn_3d)
-        
-        # 2D View button
-        self.btn_2d = QPushButton("2D View")
-        self.btn_2d.setStyleSheet("QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 8px; }")
-        self.btn_2d.clicked.connect(self.show_2d_view)
-        switcher_layout.addWidget(self.btn_2d)
-        
-        # Close button
-        self.btn_close = QPushButton("Close")
-        self.btn_close.setStyleSheet("QPushButton { background-color: #f44336; color: white; font-weight: bold; padding: 8px; }")
-        self.btn_close.clicked.connect(self.close)
-        switcher_layout.addWidget(self.btn_close)
+        # Status display
+        self.view_status = QLabel("3D View")
+        self.view_status.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50; padding: 10px;")
+        switcher_layout.addWidget(self.view_status)
         
         switcher_layout.addStretch()
+        
+        # Instructions
+        instructions = QLabel("Press 3 for 3D, 2 for 2D, R to reset, ESC to close")
+        instructions.setStyleSheet("font-size: 12px; color: gray; padding: 10px;")
+        switcher_layout.addWidget(instructions)
+        
         parent_layout.addLayout(switcher_layout)
     
     def create_3d_panel(self):
@@ -109,10 +101,6 @@ class HomeViewerApp(QMainWindow):
         # 3D viewer widget
         self.viewer_3d = Home3DViewer()
         layout_3d.addWidget(self.viewer_3d)
-        
-        # 3D controls
-        controls_3d = self.create_3d_controls()
-        layout_3d.addWidget(controls_3d)
         
         # Add to stacked layout
         self.stacked_layout.addWidget(self.panel_3d)
@@ -127,10 +115,6 @@ class HomeViewerApp(QMainWindow):
         self.viewer_2d = Home2DViewer()
         layout_2d.addWidget(self.viewer_2d)
         
-        # 2D controls
-        controls_2d = self.create_2d_controls()
-        layout_2d.addWidget(controls_2d)
-        
         # Add to stacked layout
         self.stacked_layout.addWidget(self.panel_2d)
     
@@ -139,8 +123,9 @@ class HomeViewerApp(QMainWindow):
         self.current_view = "3d"
         self.panel_3d.setVisible(True)
         self.panel_2d.setVisible(False)
-        self.btn_3d.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; }")
-        self.btn_2d.setStyleSheet("QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 8px; }")
+        if hasattr(self, 'view_status'):
+            self.view_status.setText("3D View")
+            self.view_status.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50; padding: 10px;")
         if hasattr(self, 'status_label'):
             self.status_label.setText("3D View - Drag to rotate, wheel to zoom")
     
@@ -149,120 +134,12 @@ class HomeViewerApp(QMainWindow):
         self.current_view = "2d"
         self.panel_3d.setVisible(False)
         self.panel_2d.setVisible(True)
-        self.btn_3d.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; }")
-        self.btn_2d.setStyleSheet("QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 8px; }")
+        if hasattr(self, 'view_status'):
+            self.view_status.setText("2D View")
+            self.view_status.setStyleSheet("font-size: 18px; font-weight: bold; color: #2196F3; padding: 10px;")
         if hasattr(self, 'status_label'):
             self.status_label.setText("2D View - Click rooms, wheel to zoom")
     
-    def create_3d_controls(self):
-        """Create 3D viewer controls."""
-        group = QGroupBox("3D Controls")
-        layout = QVBoxLayout(group)
-        
-        # Camera controls
-        camera_group = QGroupBox("Camera")
-        camera_layout = QVBoxLayout(camera_group)
-        
-        # Distance slider
-        distance_layout = QHBoxLayout()
-        distance_layout.addWidget(QLabel("Distance:"))
-        self.distance_slider = QSlider(Qt.Orientation.Horizontal)
-        self.distance_slider.setRange(1, 50)
-        self.distance_slider.setValue(3)
-        distance_layout.addWidget(self.distance_slider)
-        self.distance_label = QLabel("3.0")
-        distance_layout.addWidget(self.distance_label)
-        camera_layout.addLayout(distance_layout)
-        
-        # Rotation controls
-        rotation_layout = QHBoxLayout()
-        rotation_layout.addWidget(QLabel("Rotation X:"))
-        self.rotation_x_slider = QSlider(Qt.Orientation.Horizontal)
-        self.rotation_x_slider.setRange(-180, 180)
-        self.rotation_x_slider.setValue(90)
-        rotation_layout.addWidget(self.rotation_x_slider)
-        self.rotation_x_label = QLabel("90°")
-        rotation_layout.addWidget(self.rotation_x_label)
-        camera_layout.addLayout(rotation_layout)
-        
-        rotation_y_layout = QHBoxLayout()
-        rotation_y_layout.addWidget(QLabel("Rotation Y:"))
-        self.rotation_y_slider = QSlider(Qt.Orientation.Horizontal)
-        self.rotation_y_slider.setRange(-90, 90)
-        self.rotation_y_slider.setValue(40)
-        rotation_y_layout.addWidget(self.rotation_y_slider)
-        self.rotation_y_label = QLabel("40°")
-        rotation_y_layout.addWidget(self.rotation_y_label)
-        camera_layout.addLayout(rotation_y_layout)
-        
-        layout.addWidget(camera_group)
-        
-        # Model controls
-        model_group = QGroupBox("Model")
-        model_layout = QVBoxLayout(model_group)
-        
-        # Auto rotate
-        self.auto_rotate_cb = QCheckBox("Auto Rotate")
-        model_layout.addWidget(self.auto_rotate_cb)
-        
-        # Reset view button
-        reset_btn = QPushButton("Reset View")
-        model_layout.addWidget(reset_btn)
-        
-        layout.addWidget(model_group)
-        
-        # Connect signals
-        self.distance_slider.valueChanged.connect(self.update_3d_distance)
-        self.rotation_x_slider.valueChanged.connect(self.update_3d_rotation_x)
-        self.rotation_y_slider.valueChanged.connect(self.update_3d_rotation_y)
-        self.auto_rotate_cb.toggled.connect(self.toggle_auto_rotate)
-        reset_btn.clicked.connect(self.reset_3d_view)
-        
-        return group
-    
-    def create_2d_controls(self):
-        """Create 2D viewer controls."""
-        group = QGroupBox("2D Controls")
-        layout = QVBoxLayout(group)
-        
-        # View controls
-        view_group = QGroupBox("View")
-        view_layout = QVBoxLayout(view_group)
-        
-        # Zoom controls
-        zoom_layout = QHBoxLayout()
-        zoom_layout.addWidget(QLabel("Zoom:"))
-        self.zoom_slider = QSlider(Qt.Orientation.Horizontal)
-        self.zoom_slider.setRange(10, 500)
-        self.zoom_slider.setValue(100)
-        zoom_layout.addWidget(self.zoom_slider)
-        self.zoom_label = QLabel("100%")
-        zoom_layout.addWidget(self.zoom_label)
-        view_layout.addLayout(zoom_layout)
-        
-        # Reset view button
-        reset_2d_btn = QPushButton("Reset View")
-        view_layout.addWidget(reset_2d_btn)
-        
-        layout.addWidget(view_group)
-        
-        
-        # Synchronization
-        sync_group = QGroupBox("Synchronization")
-        sync_layout = QVBoxLayout(sync_group)
-        
-        self.sync_views_cb = QCheckBox("Sync Views")
-        self.sync_views_cb.setChecked(True)
-        sync_layout.addWidget(self.sync_views_cb)
-        
-        layout.addWidget(sync_group)
-        
-        # Connect signals
-        self.zoom_slider.valueChanged.connect(self.update_2d_zoom)
-        reset_2d_btn.clicked.connect(self.reset_2d_view)
-        self.sync_views_cb.toggled.connect(self.toggle_sync_views)
-        
-        return group
     
     def setup_connections(self):
         """Setup signal connections."""
@@ -334,58 +211,6 @@ class HomeViewerApp(QMainWindow):
         else:
             self.status_label.setText("2D View - Click rooms, wheel to zoom")
     
-    def update_3d_distance(self, value):
-        """Update 3D camera distance."""
-        self.viewer_3d.camera_distance = value
-        self.distance_label.setText(f"{value}.0")
-        self.viewer_3d.update()
-    
-    def update_3d_rotation_x(self, value):
-        """Update 3D camera rotation X."""
-        self.viewer_3d.camera_angle_x = math.radians(value)
-        self.rotation_x_label.setText(f"{value}°")
-        self.viewer_3d.update()
-    
-    def update_3d_rotation_y(self, value):
-        """Update 3D camera rotation Y."""
-        self.viewer_3d.camera_angle_y = math.radians(value)
-        self.rotation_y_label.setText(f"{value}°")
-        self.viewer_3d.update()
-    
-    def toggle_auto_rotate(self, checked):
-        """Toggle auto rotation."""
-        self.viewer_3d.auto_rotate = checked
-        if checked:
-            self.viewer_3d.timer.start(16)
-        else:
-            self.viewer_3d.timer.stop()
-    
-    def reset_3d_view(self):
-        """Reset 3D view."""
-        self.viewer_3d.reset_view()
-        self.distance_slider.setValue(3)
-        self.rotation_x_slider.setValue(90)
-        self.rotation_y_slider.setValue(40)
-        self.auto_rotate_cb.setChecked(False)
-    
-    def update_2d_zoom(self, value):
-        """Update 2D zoom."""
-        zoom_factor = value / 100.0
-        self.viewer_2d.zoom_factor = zoom_factor
-        self.zoom_label.setText(f"{value}%")
-        # Apply zoom transformation
-        self.viewer_2d.resetTransform()
-        self.viewer_2d.scale(zoom_factor, zoom_factor)
-    
-    def reset_2d_view(self):
-        """Reset 2D view."""
-        self.viewer_2d.reset_view()
-        self.zoom_slider.setValue(100)
-    
-    def toggle_sync_views(self):
-        """Toggle view synchronization."""
-        self.sync_views = self.sync_views_cb.isChecked()
-        self.status_label.setText(f"View sync: {'ON' if self.sync_views else 'OFF'}")
     
     def on_3d_view_changed(self, x, y, z):
         """Handle 3D view changes."""
@@ -412,14 +237,16 @@ class HomeViewerApp(QMainWindow):
     
     def reset_all_views(self):
         """Reset both views."""
-        self.reset_3d_view()
-        self.reset_2d_view()
-        self.status_label.setText("All views reset")
+        self.viewer_3d.reset_view()
+        self.viewer_2d.reset_view()
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("Views reset")
     
     def toggle_sync(self):
         """Toggle synchronization."""
-        self.sync_views_cb.setChecked(not self.sync_views_cb.isChecked())
-        self.toggle_sync_views()
+        self.sync_views = not self.sync_views
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(f"View sync: {'ON' if self.sync_views else 'OFF'}")
     
     
     def closeEvent(self, event):
