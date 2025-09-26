@@ -48,8 +48,8 @@ class HomeViewerApp(QMainWindow):
         self.light_states = self.device_states  # Keep compatibility with existing code
         
         # Camera states
-        self.camera_states = [False] * 8  # 8 cameras, all initially off
-        self.recording_states = [False] * 8  # 8 recording states, all initially off
+        self.camera_states = [False] * 2  # 2 cameras, all initially off
+        self.recording_states = [False] * 2  # 2 recording states, all initially off
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -467,7 +467,7 @@ class HomeViewerApp(QMainWindow):
         status_layout.addWidget(status_title)
         
         # Camera count and status
-        self.camera_status_label = QLabel("8 cameras online")
+        self.camera_status_label = QLabel("2 cameras online")
         self.camera_status_label.setStyleSheet("""
             font-size: 12px;
             color: #cccccc;
@@ -475,7 +475,7 @@ class HomeViewerApp(QMainWindow):
         """)
         status_layout.addWidget(self.camera_status_label)
         
-        self.recording_status_label = QLabel("Recording: 3 cameras")
+        self.recording_status_label = QLabel("Recording: 0 cameras")
         self.recording_status_label.setStyleSheet("""
             font-size: 12px;
             color: #cccccc;
@@ -521,13 +521,7 @@ class HomeViewerApp(QMainWindow):
         # Define camera locations
         camera_locations = [
             ("Front Door", "CAM1"),
-            ("Back Door", "CAM2"),
-            ("Living Room", "CAM3"),
-            ("Kitchen", "CAM4"),
-            ("Bedroom 1", "CAM5"),
-            ("Bedroom 2", "CAM6"),
-            ("Bedroom 3", "CAM7"),
-            ("Garage", "CAM8")
+            ("Back Door", "CAM2")
         ]
         
         # Create camera controls
@@ -718,7 +712,7 @@ class HomeViewerApp(QMainWindow):
         """Update the camera status display."""
         if hasattr(self, 'camera_status_label'):
             on_count = sum(self.camera_states)
-            self.camera_status_label.setText(f"{on_count}/8 cameras online")
+            self.camera_status_label.setText(f"{on_count}/2 cameras online")
         
         if hasattr(self, 'recording_status_label'):
             recording_count = sum(self.recording_states)
@@ -726,7 +720,7 @@ class HomeViewerApp(QMainWindow):
     
     def start_all_recording(self):
         """Start recording on all cameras that are on."""
-        for i in range(8):
+        for i in range(2):
             if self.camera_states[i]:
                 self.recording_states[i] = True
                 self.update_recording_button(i)
@@ -737,7 +731,7 @@ class HomeViewerApp(QMainWindow):
     
     def stop_all_recording(self):
         """Stop recording on all cameras."""
-        for i in range(8):
+        for i in range(2):
             self.recording_states[i] = False
             self.update_recording_button(i)
         
