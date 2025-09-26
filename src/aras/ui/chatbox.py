@@ -40,15 +40,15 @@ class ChatMessage(QWidget):
     def init_ui(self):
         """Initialize the message UI."""
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setContentsMargins(0, 5, 0, 5)  # Remove left/right margins
         
         # Set colors and alignment based on message type
         if self.is_user:
-            # User messages: align to right
-            layout.addStretch()  # Add stretch before to push content right
+            # User messages: align to right - add stretch before to push content right
+            layout.addStretch()
         else:
-            # AI messages: align to left
-            pass  # No stretch before for AI messages
+            # AI messages: align to left - no stretch before
+            pass
         
         # Message container
         message_frame = QFrame()
@@ -66,6 +66,7 @@ class ChatMessage(QWidget):
                     border: 1px solid #1E40AF;
                     border-radius: 0px;
                     color: white;
+                    margin-right: 10px;
                 }
             """)
         else:
@@ -75,6 +76,7 @@ class ChatMessage(QWidget):
                     border: 1px solid #333333;
                     border-radius: 0px;
                     color: #FFFFFF;
+                    margin-left: 10px;
                 }
             """)
         
@@ -121,8 +123,9 @@ class ChatMessage(QWidget):
         
         layout.addWidget(message_frame)
         
-        # Add stretch after message frame for user messages to complete right alignment
-        if self.is_user:
+        # For user messages, don't add stretch after - this was causing centering
+        # For AI messages, add stretch after to push them to the left
+        if not self.is_user:
             layout.addStretch()
 
 
@@ -269,7 +272,7 @@ class ChatBox(QWidget):
         # Messages container
         self.messages_widget = QWidget()
         self.messages_layout = QVBoxLayout(self.messages_widget)
-        self.messages_layout.setContentsMargins(10, 10, 10, 10)
+        self.messages_layout.setContentsMargins(0, 10, 0, 10)  # Remove left/right margins
         self.messages_layout.setSpacing(5)
         self.messages_layout.addStretch()  # Push messages to top
         
