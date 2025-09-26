@@ -11,6 +11,7 @@ from PyQt6.QtCore import QRect
 
 from .voice_handler import VoiceCommandProcessor
 from .qt_visualizer import QtVisualizer
+from .chatbox import ChatBox
 
 
 class CircularIndicator(QWidget):
@@ -266,6 +267,11 @@ class HeadlessAgentWindow(QWidget):
         # Setup voice command processor
         self.voice_processor = VoiceCommandProcessor()
         
+        # Setup chatbox
+        self.chatbox = ChatBox()
+        self.chatbox.chatbox_closed.connect(self.on_chatbox_closed)
+        self.chatbox.message_sent.connect(self.on_chatbox_message_sent)
+        
         # Setup tool registry for voice commands
         from ..tools.registry import create_tool_registry
         self.tool_registry = create_tool_registry()
@@ -285,6 +291,8 @@ class HeadlessAgentWindow(QWidget):
         self.voice_processor.handler.speaking_started.connect(self.on_speaking_started)
         self.voice_processor.handler.speaking_stopped.connect(self.on_speaking_stopped)
         self.voice_processor.handler.file_operation_requested.connect(self.on_file_operation_requested)
+        self.voice_processor.handler.chatbox_requested.connect(self.on_chatbox_requested)
+        self.voice_processor.handler.chatbox_hide_requested.connect(self.on_chatbox_hide_requested)
         
         # Start background listening for wake words
         self.voice_processor.start_background_listening()
@@ -382,6 +390,12 @@ class HeadlessAgentWindow(QWidget):
             except Exception as e:
                 print(f"[DEBUG-UI-{timestamp}] ERROR setting timer: {e}")
             
+            # Add user message to chatbox
+            try:
+                self.chatbox.add_voice_message(command, is_user=True)
+            except Exception as e:
+                print(f"[DEBUG-UI-{timestamp}] ERROR adding user message to chatbox: {e}")
+            
             # Handle response immediately to avoid duplication with voice_response signal
             if result.get('response'):
                 try:
@@ -400,6 +414,12 @@ class HeadlessAgentWindow(QWidget):
                     self._last_response_text = response_text
                     
                     print(f"[DEBUG-UI-{timestamp}] IMMEDIATE_RESPONSE: Handling response from command_processed")
+                    
+                    # Add AI response to chatbox
+                    try:
+                        self.chatbox.add_ai_response(response_text)
+                    except Exception as e:
+                        print(f"[DEBUG-UI-{timestamp}] ERROR adding AI response to chatbox: {e}")
                     
                     # Safely set response
                     try:
@@ -546,6 +566,34 @@ class HeadlessAgentWindow(QWidget):
         self.agent_active = active
         self.indicator.set_active(active)
         self.update_status_text()
+    
+    def on_chatbox_requested(self):
+        """Handle chatbox request from voice command."""
+        print("=== CHATBOX REQUEST HANDLER ===")
+        print("Chatbox requested via voice command")
+        # Position chatbox near the main window
+        main_pos = self.pos()
+        chatbox_pos = (main_pos.x() + self.width() + 20, main_pos.y())
+        print(f"Positioning chatbox at: {chatbox_pos}")
+        self.chatbox.show_chatbox(chatbox_pos)
+        print("=== CHATBOX REQUEST HANDLER COMPLETE ===")
+    
+    def on_chatbox_hide_requested(self):
+        """Handle chatbox hide request from voice command."""
+        print("=== CHATBOX HIDE REQUEST HANDLER ===")
+        print("Chatbox hide requested via voice command")
+        self.chatbox.close_chatbox()
+        print("=== CHATBOX HIDE REQUEST HANDLER COMPLETE ===")
+    
+    def on_chatbox_closed(self):
+        """Handle chatbox closed signal."""
+        print("Chatbox closed")
+    
+    def on_chatbox_message_sent(self, message: str):
+        """Handle message sent from chatbox."""
+        print(f"Message sent from chatbox: {message}")
+        # Process the message through the voice handler
+        self.voice_processor.handler.process_voice_command(message)
     
     def mousePressEvent(self, event):
         """Handle mouse press events for dragging."""

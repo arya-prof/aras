@@ -32,11 +32,14 @@ class VoiceCommandHandler(QObject):
     voice_response = pyqtSignal(str)  # TTS response
     speaking_started = pyqtSignal()  # When TTS starts speaking
     speaking_stopped = pyqtSignal()  # When TTS stops speaking
+    chatbox_requested = pyqtSignal()  # When chatbox should be shown
+    chatbox_hide_requested = pyqtSignal()  # When chatbox should be hidden
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.home_status_callback: Optional[Callable] = None
         self.file_operation_callback: Optional[Callable] = None
+        self.chatbox_callback: Optional[Callable] = None
         self.openai_client = None
         self.tts_engine = None
         self.tool_registry = None  # Will be set by the UI
@@ -238,9 +241,53 @@ class VoiceCommandHandler(QObject):
             r"handle.*files"
         ]
         
+        # Chatbox command patterns
+        self.chatbox_patterns = [
+            r"show.*chat",
+            r"open.*chat",
+            r"chat.*box",
+            r"show.*chatbox",
+            r"open.*chatbox",
+            r"show.*conversation",
+            r"open.*conversation",
+            r"show.*history",
+            r"open.*history",
+            r"chat.*history",
+            r"conversation.*history",
+            r"show.*messages",
+            r"open.*messages",
+            r"display.*chat",
+            r"view.*chat",
+            r"chat.*window",
+            r"message.*window"
+        ]
+        
+        # Chatbox hide patterns
+        self.chatbox_hide_patterns = [
+            r"hide.*chat",
+            r"close.*chat",
+            r"hide.*chatbox",
+            r"close.*chatbox",
+            r"hide.*conversation",
+            r"close.*conversation",
+            r"hide.*history",
+            r"close.*history",
+            r"hide.*messages",
+            r"close.*messages",
+            r"minimize.*chat",
+            r"minimize.*chatbox",
+            r"chat.*close",
+            r"chatbox.*close",
+            r"conversation.*close",
+            r"history.*close",
+            r"messages.*close"
+        ]
+        
         # Compile patterns for efficiency
         self.compiled_home_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns]
         self.compiled_file_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns]
+        self.compiled_chatbox_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_patterns]
+        self.compiled_chatbox_hide_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_hide_patterns]
     
     def set_home_status_callback(self, callback: Callable):
         """Set the callback function for home status requests."""
@@ -249,6 +296,10 @@ class VoiceCommandHandler(QObject):
     def set_file_operation_callback(self, callback: Callable):
         """Set the callback function for file operation requests."""
         self.file_operation_callback = callback
+    
+    def set_chatbox_callback(self, callback: Callable):
+        """Set the callback function for chatbox requests."""
+        self.chatbox_callback = callback
     
     def set_tool_registry(self, tool_registry):
         """Set the tool registry for executing tools."""
@@ -275,7 +326,28 @@ class VoiceCommandHandler(QObject):
         
         print(f"[DEBUG-{command_id}] VOICE_INPUT: You: {text}")
         
-        # Try LLM processing first if available
+        # Check for chatbox patterns first (before LLM processing)
+        text_lower = text.lower()
+        
+        # Check for chatbox hide patterns
+        for i, pattern in enumerate(self.compiled_chatbox_hide_patterns):
+            if pattern.search(text_lower):
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Chatbox hide pattern {i+1}: {self.chatbox_hide_patterns[i]}")
+                print(f"[DEBUG-{command_id}] TRIGGER_CHATBOX_HIDE: Triggering chatbox hide")
+                self.trigger_chatbox_hide()
+                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
+                return True
+        
+        # Check for chatbox show patterns
+        for i, pattern in enumerate(self.compiled_chatbox_patterns):
+            if pattern.search(text_lower):
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Chatbox pattern {i+1}: {self.chatbox_patterns[i]}")
+                print(f"[DEBUG-{command_id}] TRIGGER_CHATBOX: Triggering chatbox")
+                self.trigger_chatbox()
+                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
+                return True
+        
+        # Try LLM processing if available
         if self.llm_client:
             try:
                 print(f"[DEBUG-{command_id}] LLM_PROCESSING: Starting LLM processing")
@@ -314,6 +386,7 @@ class VoiceCommandHandler(QObject):
                 self.trigger_file_operation(text, match)
                 print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
+        
         
         print(f"[DEBUG-{command_id}] NO_MATCH: No patterns matched for: '{text}'")
         print(f"[DEBUG-{command_id}] PROCESSING_FAILED: Command not recognized")
@@ -902,6 +975,24 @@ $synth.Dispose()''')
         # Emit the signal to trigger home status
         self.home_status_requested.emit()
         print("Signal emitted for home status")
+    
+    def trigger_chatbox(self):
+        """Trigger the chatbox display."""
+        print("=== CHATBOX TRIGGER ===")
+        print("Triggering chatbox display...")
+        # Emit the signal to trigger chatbox
+        self.chatbox_requested.emit()
+        print("Signal emitted for chatbox")
+        print("=== CHATBOX TRIGGER COMPLETE ===")
+    
+    def trigger_chatbox_hide(self):
+        """Trigger the chatbox hide."""
+        print("=== CHATBOX HIDE TRIGGER ===")
+        print("Triggering chatbox hide...")
+        # Emit the signal to trigger chatbox hide
+        self.chatbox_hide_requested.emit()
+        print("Signal emitted for chatbox hide")
+        print("=== CHATBOX HIDE TRIGGER COMPLETE ===")
     
     def trigger_file_operation(self, text: str, match):
         """Trigger a file operation based on voice command."""
