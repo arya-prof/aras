@@ -55,8 +55,8 @@ class ChatMessage(QWidget):
         message_frame.setFrameStyle(QFrame.Shape.Box)
         message_frame.setLineWidth(1)
         
-        # Set maximum width for both message types
-        message_frame.setMaximumWidth(350)  # Consistent width for both user and AI messages
+        # Set maximum width for both message types - use full width
+        # message_frame.setMaximumWidth(350)  # Removed to allow full width
         
         # Set colors based on message type
         if self.is_user:
@@ -93,7 +93,7 @@ class ChatMessage(QWidget):
         # Message text
         message_label = QLabel(self.message)
         message_label.setWordWrap(True)
-        message_label.setMaximumWidth(320)  # Consistent width for both message types
+        # message_label.setMaximumWidth(320)  # Removed to allow full width
         message_label.setAlignment(Qt.AlignmentFlag.AlignLeft if not self.is_user else Qt.AlignmentFlag.AlignRight)
         message_label.setStyleSheet("""
             QLabel {
@@ -121,12 +121,14 @@ class ChatMessage(QWidget):
         content_layout.addWidget(message_label)
         content_layout.addWidget(time_label)
         
-        layout.addWidget(message_frame)
-        
-        # For user messages, don't add stretch after - this was causing centering
-        # For AI messages, add stretch after to push them to the left
-        if not self.is_user:
-            layout.addStretch()
+        # Add the message frame with appropriate stretch factor
+        if self.is_user:
+            # User messages: add to the right side
+            layout.addWidget(message_frame, 0)  # No stretch factor
+        else:
+            # AI messages: add to the left side
+            layout.addWidget(message_frame, 0)  # No stretch factor
+            layout.addStretch()  # Add stretch after to push to left
 
 
 class ChatBox(QWidget):
@@ -391,6 +393,9 @@ class ChatBox(QWidget):
         self.show_animation.setEndValue(end_rect)
         self.show_animation.start()
         print("Animation started")
+        
+        # Auto-scroll to bottom after animation completes
+        self.show_animation.finished.connect(self.scroll_to_bottom)
         print("=== CHATBOX SHOW COMPLETE ===")
     
     def close_chatbox(self):
@@ -442,6 +447,8 @@ class ChatBox(QWidget):
         """Scroll to the bottom of the messages."""
         scrollbar = self.scroll_area.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+        # Force update to ensure scrolling happens
+        self.scroll_area.update()
     
     def load_conversation_history(self):
         """Load conversation history from file."""
@@ -465,6 +472,8 @@ class ChatBox(QWidget):
         try:
             for msg in self.conversation_history[-50:]:  # Show last 50 messages
                 self.add_message(msg["message"], msg["is_user"], msg["timestamp"])
+            # Ensure we scroll to bottom after loading all messages
+            QTimer.singleShot(200, self.scroll_to_bottom)
         except Exception as e:
             print(f"Error displaying loaded messages: {e}")
     
