@@ -42,58 +42,77 @@ class ChatMessage(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
         
+        # Set colors and alignment based on message type
+        if self.is_user:
+            # User messages: align to right
+            layout.addStretch()  # Add stretch before to push content right
+        else:
+            # AI messages: align to left
+            pass  # No stretch before for AI messages
+        
         # Message container
         message_frame = QFrame()
         message_frame.setFrameStyle(QFrame.Shape.Box)
         message_frame.setLineWidth(1)
         
+        # Set maximum width for both message types
+        message_frame.setMaximumWidth(350)  # Consistent width for both user and AI messages
+        
         # Set colors based on message type
         if self.is_user:
             message_frame.setStyleSheet("""
                 QFrame {
-                    background-color: #007AFF;
-                    border: 1px solid #0056CC;
-                    border-radius: 15px;
+                    background-color: #1E3A8A;
+                    border: 1px solid #1E40AF;
+                    border-radius: 0px;
                     color: white;
                 }
             """)
-            layout.addStretch()  # Push user messages to the right
         else:
             message_frame.setStyleSheet("""
                 QFrame {
-                    background-color: #F2F2F7;
-                    border: 1px solid #C7C7CC;
-                    border-radius: 15px;
-                    color: #000000;
+                    background-color: #2A2A2A;
+                    border: 1px solid #333333;
+                    border-radius: 0px;
+                    color: #FFFFFF;
                 }
             """)
-            layout.addStretch(0)  # Keep AI messages on the left
         
         # Message content layout
         content_layout = QVBoxLayout(message_frame)
         content_layout.setContentsMargins(15, 10, 15, 10)
         
+        # Set alignment for content based on message type
+        if self.is_user:
+            content_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+        else:
+            content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        
         # Message text
         message_label = QLabel(self.message)
         message_label.setWordWrap(True)
-        message_label.setMaximumWidth(300)  # Limit width for better readability
+        message_label.setMaximumWidth(320)  # Consistent width for both message types
+        message_label.setAlignment(Qt.AlignmentFlag.AlignLeft if not self.is_user else Qt.AlignmentFlag.AlignRight)
         message_label.setStyleSheet("""
             QLabel {
-                font-size: 14px;
-                line-height: 1.4;
+                font-size: 13px;
+                line-height: 1.3;
                 background-color: transparent;
                 border: none;
+                font-weight: 400;
             }
         """)
         
         # Timestamp
         time_label = QLabel(self.timestamp)
+        time_label.setAlignment(Qt.AlignmentFlag.AlignLeft if not self.is_user else Qt.AlignmentFlag.AlignRight)
         time_label.setStyleSheet("""
             QLabel {
-                font-size: 11px;
-                color: #8E8E93;
+                font-size: 10px;
+                color: #666666;
                 background-color: transparent;
                 border: none;
+                font-weight: 300;
             }
         """)
         
@@ -102,8 +121,9 @@ class ChatMessage(QWidget):
         
         layout.addWidget(message_frame)
         
-        if not self.is_user:
-            layout.addStretch()  # Push AI messages to the left
+        # Add stretch after message frame for user messages to complete right alignment
+        if self.is_user:
+            layout.addStretch()
 
 
 class ChatBox(QWidget):
@@ -126,16 +146,19 @@ class ChatBox(QWidget):
         """Initialize the chatbox UI."""
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(400, 600)
         
-        # Main container with rounded corners
+        # Get screen dimensions for full height
+        screen = QApplication.primaryScreen().geometry()
+        self.setFixedSize(400, screen.height())
+        
+        # Main container with sharp borders
         self.main_frame = QFrame()
         self.main_frame.setFrameStyle(QFrame.Shape.Box)
         self.main_frame.setStyleSheet("""
             QFrame {
-                background-color: rgba(255, 255, 255, 0.95);
-                border: 1px solid #E5E5EA;
-                border-radius: 20px;
+                background-color: rgba(18, 18, 18, 0.95);
+                border: 1px solid #333333;
+                border-radius: 0px;
             }
         """)
         
@@ -165,10 +188,10 @@ class ChatBox(QWidget):
         header_frame = QFrame()
         header_frame.setStyleSheet("""
             QFrame {
-                background-color: #F2F2F7;
-                border-top-left-radius: 20px;
-                border-top-right-radius: 20px;
-                border-bottom: 1px solid #E5E5EA;
+                background-color: #1A1A1A;
+                border-top-left-radius: 0px;
+                border-top-right-radius: 0px;
+                border-bottom: 1px solid #333333;
             }
         """)
         header_frame.setFixedHeight(50)
@@ -177,34 +200,35 @@ class ChatBox(QWidget):
         header_layout.setContentsMargins(15, 10, 15, 10)
         
         # Title
-        title_label = QLabel("💬 Chat History")
+        title_label = QLabel("Chat")
         title_label.setStyleSheet("""
             QLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: #000000;
+                font-size: 14px;
+                font-weight: 500;
+                color: #FFFFFF;
                 background-color: transparent;
                 border: none;
             }
         """)
         
         # Close button
-        close_button = QPushButton("✕")
-        close_button.setFixedSize(30, 30)
+        close_button = QPushButton("×")
+        close_button.setFixedSize(24, 24)
         close_button.setStyleSheet("""
             QPushButton {
-                background-color: #FF3B30;
-                color: white;
-                border: none;
-                border-radius: 15px;
-                font-size: 14px;
-                font-weight: bold;
+                background-color: #333333;
+                color: #CCCCCC;
+                border: 1px solid #444444;
+                border-radius: 0px;
+                font-size: 12px;
+                font-weight: 400;
             }
             QPushButton:hover {
-                background-color: #FF2D55;
+                background-color: #444444;
+                color: #FFFFFF;
             }
             QPushButton:pressed {
-                background-color: #D70015;
+                background-color: #555555;
             }
         """)
         close_button.clicked.connect(self.close_chatbox)
@@ -228,17 +252,17 @@ class ChatBox(QWidget):
                 border: none;
             }
             QScrollBar:vertical {
-                background-color: #F2F2F7;
-                width: 8px;
-                border-radius: 4px;
+                background-color: #1A1A1A;
+                width: 6px;
+                border-radius: 0px;
             }
             QScrollBar::handle:vertical {
-                background-color: #C7C7CC;
-                border-radius: 4px;
+                background-color: #333333;
+                border-radius: 0px;
                 min-height: 20px;
             }
             QScrollBar::handle:vertical:hover {
-                background-color: #AEAEB2;
+                background-color: #444444;
             }
         """)
         
@@ -257,10 +281,10 @@ class ChatBox(QWidget):
         input_frame = QFrame()
         input_frame.setStyleSheet("""
             QFrame {
-                background-color: #F2F2F7;
-                border-top: 1px solid #E5E5EA;
-                border-bottom-left-radius: 20px;
-                border-bottom-right-radius: 20px;
+                background-color: #1A1A1A;
+                border-top: 1px solid #333333;
+                border-bottom-left-radius: 0px;
+                border-bottom-right-radius: 0px;
             }
         """)
         input_frame.setFixedHeight(80)
@@ -274,11 +298,12 @@ class ChatBox(QWidget):
         self.text_input.setPlaceholderText("Type a message...")
         self.text_input.setStyleSheet("""
             QTextEdit {
-                background-color: white;
-                border: 1px solid #C7C7CC;
-                border-radius: 15px;
+                background-color: #2A2A2A;
+                border: 1px solid #333333;
+                border-radius: 0px;
                 padding: 8px 12px;
                 font-size: 14px;
+                color: #FFFFFF;
             }
             QTextEdit:focus {
                 border-color: #007AFF;
@@ -294,7 +319,7 @@ class ChatBox(QWidget):
                 background-color: #007AFF;
                 color: white;
                 border: none;
-                border-radius: 15px;
+                border-radius: 0px;
                 font-size: 14px;
                 font-weight: bold;
             }
@@ -331,13 +356,21 @@ class ChatBox(QWidget):
         print("=== CHATBOX SHOW ===")
         print(f"show_chatbox called with position: {position}")
         
+        # Get screen dimensions
+        screen = QApplication.primaryScreen().geometry()
+        
         if position is None:
-            # Center on screen
-            screen = QApplication.primaryScreen().geometry()
-            x = (screen.width() - self.width()) // 2
-            y = (screen.height() - self.height()) // 2
+            # Position at right edge of screen, full height
+            x = screen.width() - self.width()
+            y = 0
             position = (x, y)
-            print(f"Centered position: {position}")
+            print(f"Right edge position: {position}")
+        else:
+            # Use provided position but ensure full height
+            x = position[0]
+            y = 0
+            position = (x, y)
+            print(f"Custom position (adjusted for full height): {position}")
         
         # Set initial position (off-screen to the right)
         start_rect = QRect(position[0] + self.width(), position[1], self.width(), self.height())
@@ -418,12 +451,19 @@ class ChatBox(QWidget):
                 with open(history_file, 'r', encoding='utf-8') as f:
                     self.conversation_history = json.load(f)
                 
-                # Display loaded messages
-                for msg in self.conversation_history[-50:]:  # Show last 50 messages
-                    self.add_message(msg["message"], msg["is_user"], msg["timestamp"])
+                # Display loaded messages after a short delay to ensure UI is ready
+                QTimer.singleShot(100, self._display_loaded_messages)
         except Exception as e:
             print(f"Error loading conversation history: {e}")
             self.conversation_history = []
+    
+    def _display_loaded_messages(self):
+        """Display loaded messages from history."""
+        try:
+            for msg in self.conversation_history[-50:]:  # Show last 50 messages
+                self.add_message(msg["message"], msg["is_user"], msg["timestamp"])
+        except Exception as e:
+            print(f"Error displaying loaded messages: {e}")
     
     def save_conversation_history(self):
         """Save conversation history to file."""

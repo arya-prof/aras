@@ -571,11 +571,9 @@ class HeadlessAgentWindow(QWidget):
         """Handle chatbox request from voice command."""
         print("=== CHATBOX REQUEST HANDLER ===")
         print("Chatbox requested via voice command")
-        # Position chatbox near the main window
-        main_pos = self.pos()
-        chatbox_pos = (main_pos.x() + self.width() + 20, main_pos.y())
-        print(f"Positioning chatbox at: {chatbox_pos}")
-        self.chatbox.show_chatbox(chatbox_pos)
+        # Position chatbox at right edge of screen (let chatbox handle positioning)
+        print("Positioning chatbox at right edge of screen")
+        self.chatbox.show_chatbox()  # No position parameter - will use right edge
         print("=== CHATBOX REQUEST HANDLER COMPLETE ===")
     
     def on_chatbox_hide_requested(self):
