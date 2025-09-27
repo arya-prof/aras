@@ -14,6 +14,7 @@ try:
     import speech_recognition as sr
     import pyaudio
     import openai
+    import pyttsx3
     SPEECH_RECOGNITION_AVAILABLE = True
 except ImportError:
     SPEECH_RECOGNITION_AVAILABLE = False
@@ -833,132 +834,95 @@ class VoiceCommandHandler(QObject):
         return None
     
     def speak_response(self, text: str):
-        """Convert text to speech with persistent audio output."""
+        """Convert text to speech using pyttsx3 only."""
         try:
-            import threading
-            import time
-            import subprocess
-            import os
+            print(f"[DEBUG-TTS] speak_response called with: {text}")
             
             # Emit speaking started signal
             self.speaking_started.emit()
             
-            def speak_with_persistent_audio():
-                success = False
-                
-                # Method 1: Use Windows PowerShell TTS (most reliable)
-                try:
-                    # Use a more robust approach with here-string to avoid quote escaping issues
-                    import tempfile
-                    import os
-                    
-                    # Create a temporary PowerShell script file
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False) as f:
-                        f.write(f'''Add-Type -AssemblyName System.Speech
-$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$synth.Rate = {settings.voice_rate}
-$synth.Volume = {settings.voice_volume}
-
-# Try to set Zira voice
-$voices = $synth.GetInstalledVoices()
-$ziraVoice = $voices | Where-Object {{ $_.VoiceInfo.Name -like "*Zira*" }}
-if ($ziraVoice) {{
-    $synth.SelectVoice($ziraVoice.VoiceInfo.Name)
-}}
-
-$synth.Speak(@"
-{text}
-"@)
-$synth.Dispose()''')
-                        script_path = f.name
-                    
-                    # Execute the PowerShell script with shorter timeout
-                    cmd = f'powershell -ExecutionPolicy Bypass -File "{script_path}"'
-                    subprocess.run(cmd, shell=True, check=True, timeout=5)  # Reduced from 8 to 5 seconds
-                    
-                    # Clean up the temporary file
+            # Check if pyttsx3 is available
+            if not SPEECH_RECOGNITION_AVAILABLE:
+                print("[DEBUG-TTS] pyttsx3 not available, falling back to text")
+                print(f"[DEBUG-TTS] FALLBACK: Aras: {text}")
+                self.speaking_stopped.emit()
+                return
+            
+            # Always create a fresh TTS engine to avoid pyttsx3 "stuck" issues
+            print("[DEBUG-TTS] Creating fresh TTS engine...")
+            try:
+                # Clean up existing engine if any
+                if hasattr(self, 'tts_engine') and self.tts_engine is not None:
                     try:
-                        os.unlink(script_path)
+                        self.tts_engine.stop()
                     except:
                         pass
-                    
-                    print(f"[DEBUG-TTS] WINDOWS_TTS: Aras: {text}")
-                    success = True
-                    
-                except subprocess.TimeoutExpired:
-                    print("Warning: Windows TTS timed out, switching to pyttsx3")
-                except Exception as e:
-                    print(f"Warning: Windows TTS failed: {e}, switching to pyttsx3")
+                    self.tts_engine = None
                 
-                # Method 2: Try pyttsx3 with forced cleanup
-                if not success:
-                    # Small delay to prevent visual glitches during TTS switch
-                    time.sleep(0.1)
-                    try:
-                        import pyttsx3
-                        engine = pyttsx3.init()
-                        engine.setProperty('rate', 150)
-                        engine.setProperty('volume', 1.0)
-                        
-                        voices = engine.getProperty('voices')
-                        if voices:
-                            engine.setProperty('voice', voices[0].id)
-                        
-                        engine.say(text)
-                        engine.runAndWait()
-                        
-                        # Force cleanup
-                        try:
-                            engine.stop()
-                        except:
-                            pass
-                        
-                        print(f"[DEBUG-TTS] PYTTSX3: Aras: {text}")
-                        success = True
+                # Create new engine
+                self.tts_engine = pyttsx3.init()
+                print("[DEBUG-TTS] TTS engine created successfully")
+                
+                # Set voice properties from settings
+                self.tts_engine.setProperty('rate', settings.voice_rate)
+                self.tts_engine.setProperty('volume', settings.voice_volume / 100.0)  # Convert to 0-1 range
+                
+                # Try to find and set a good voice
+                voices = self.tts_engine.getProperty('voices')
+                if voices:
+                    print(f"[DEBUG-TTS] Available voices: {[v.name for v in voices]}")
+                    # Look for a female voice first (like Zira), then fall back to first available
+                    female_voice = None
+                    for voice in voices:
+                        if 'female' in voice.name.lower() or 'zira' in voice.name.lower():
+                            female_voice = voice
+                            break
                     
-                    except Exception as e:
-                        print(f"Error: pyttsx3 failed: {e}")
+                    if female_voice:
+                        self.tts_engine.setProperty('voice', female_voice.id)
+                        print(f"[DEBUG-TTS] Selected female voice: {female_voice.name}")
+                    else:
+                        self.tts_engine.setProperty('voice', voices[0].id)
+                        print(f"[DEBUG-TTS] Selected first available voice: {voices[0].name}")
                 
-                # Method 3: Try Windows SAPI directly
-                if not success:
-                    try:
-                        import win32com.client
-                        speaker = win32com.client.Dispatch("SAPI.SpVoice")
-                        speaker.Rate = 0
-                        speaker.Volume = 100
-                        speaker.Speak(text)
-                        print(f"[DEBUG-TTS] SAPI: Aras: {text}")
-                        success = True
-                    except Exception as e:
-                        print(f"Error: SAPI failed: {e}")
-                
-                # Method 4: Fallback to text output
-                if not success:
-                    print(f"[DEBUG-TTS] FALLBACK: Aras: {text}")
+                print(f"[DEBUG-TTS] TTS engine initialized with voice: {self.tts_engine.getProperty('voice')}")
+            except Exception as e:
+                print(f"[DEBUG-TTS] Error initializing TTS engine: {e}")
+                self.tts_engine = None
+                print(f"[DEBUG-TTS] FALLBACK: Aras: {text}")
+                self.speaking_stopped.emit()
+                return
             
-            # Run TTS in separate thread with proper cleanup
-            tts_thread = threading.Thread(target=speak_with_persistent_audio)
-            tts_thread.daemon = True
-            tts_thread.start()
-            
-            # Wait for thread to complete with shorter timeout
-            tts_thread.join(timeout=10)  # Reduced from 20 to 10 seconds
-            
-            # Check if thread is still alive (timed out)
-            if tts_thread.is_alive():
-                print("Warning: TTS thread timed out, forcing cleanup")
-                # Force cleanup by setting a flag or other mechanism
-                # The thread will eventually finish due to daemon=True
+            # Use the persistent engine directly (no threading to avoid runAndWait issues)
+            try:
+                print(f"[DEBUG-TTS] Speaking: {text}")
+                self.tts_engine.say(text)
+                self.tts_engine.runAndWait()
+                print(f"[DEBUG-TTS] PYTTSX3: Aras: {text}")
+            except Exception as e:
+                print(f"Error: pyttsx3 failed: {e}")
+                # Reset engine on error to force reinitialization
+                self.tts_engine = None
+                print(f"[DEBUG-TTS] FALLBACK: Aras: {text}")
             
             # Emit speaking stopped signal
             self.speaking_stopped.emit()
             
-            # Small delay to prevent audio conflicts
-            time.sleep(0.2)  # Reduced from 0.5 to 0.2 seconds
-            
         except Exception as e:
             print(f"Error: TTS error: {e}")
             print(f"Aras: {text}")
+            # Still emit the stopped signal even if there was an error
+            self.speaking_stopped.emit()
+    
+    def cleanup_tts_engine(self):
+        """Clean up the TTS engine when shutting down."""
+        try:
+            if hasattr(self, 'tts_engine') and self.tts_engine is not None:
+                self.tts_engine.stop()
+                self.tts_engine = None
+                print("[DEBUG-TTS] TTS engine cleaned up")
+        except Exception as e:
+            print(f"Error cleaning up TTS engine: {e}")
     
     def process_text_command(self, text: str) -> bool:
         """Process a text command (same as voice but for text input)."""

@@ -78,13 +78,13 @@ class SpeechProcessingTool(AsyncTool):
             raise RuntimeError(f"Speech-to-text conversion failed: {e}")
     
     async def _text_to_speech(self, text: str, voice: str = "zira", output_file: Optional[str] = None) -> Dict[str, Any]:
-        """Convert text to speech using OpenAI TTS or Windows TTS for Zira voice."""
+        """Convert text to speech using pyttsx3 or OpenAI TTS."""
         if not text:
             raise ValueError("text is required")
         
-        # Handle Zira voice using Windows TTS
-        if voice.lower() == "zira":
-            return await self._text_to_speech_windows(text, output_file)
+        # Use pyttsx3 for local TTS (including Zira voice)
+        if voice.lower() == "zira" or not settings.use_grok and not settings.use_openrouter and not settings.openai_api_key:
+            return await self._text_to_speech_pyttsx3(text, voice, output_file)
         
         # Check for API key and configure client for OpenAI voices
         if settings.use_grok and settings.grok_api_key:
@@ -96,7 +96,8 @@ class SpeechProcessingTool(AsyncTool):
         elif settings.openai_api_key:
             openai.api_key = settings.openai_api_key
         else:
-            raise RuntimeError("No API key configured for speech processing")
+            # Fallback to pyttsx3 if no API key
+            return await self._text_to_speech_pyttsx3(text, voice, output_file)
         
         if not output_file:
             output_file = f"tts_output_{hash(text)}.mp3"
@@ -121,59 +122,59 @@ class SpeechProcessingTool(AsyncTool):
                 "model": settings.tts_model
             }
         except Exception as e:
-            raise RuntimeError(f"Text-to-speech conversion failed: {e}")
+            # Fallback to pyttsx3 if OpenAI TTS fails
+            return await self._text_to_speech_pyttsx3(text, voice, output_file)
     
-    async def _text_to_speech_windows(self, text: str, output_file: Optional[str] = None) -> Dict[str, Any]:
-        """Convert text to speech using Windows TTS with Zira voice."""
-        import tempfile
-        import subprocess
+    async def _text_to_speech_pyttsx3(self, text: str, voice: str = "zira", output_file: Optional[str] = None) -> Dict[str, Any]:
+        """Convert text to speech using pyttsx3."""
+        import pyttsx3
         import os
         
         if not output_file:
             output_file = f"tts_output_{hash(text)}.wav"
         
         try:
-            # Create a temporary PowerShell script file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.ps1', delete=False) as f:
-                f.write(f'''Add-Type -AssemblyName System.Speech
-$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$synth.Rate = {settings.voice_rate}
-$synth.Volume = {settings.voice_volume}
-
-# Try to set Zira voice
-$voices = $synth.GetInstalledVoices()
-$ziraVoice = $voices | Where-Object {{ $_.VoiceInfo.Name -like "*Zira*" }}
-if ($ziraVoice) {{
-    $synth.SelectVoice($ziraVoice.VoiceInfo.Name)
-}}
-
-# Save to file instead of speaking
-$synth.SetOutputToWaveFile("{output_file}")
-$synth.Speak(@"
-{text}
-"@)
-$synth.Dispose()''')
-                script_path = f.name
+            engine = pyttsx3.init()
             
-            # Execute the PowerShell script
-            cmd = f'powershell -ExecutionPolicy Bypass -File "{script_path}"'
-            subprocess.run(cmd, shell=True, check=True, timeout=15)
+            # Set voice properties from settings
+            engine.setProperty('rate', settings.voice_rate)
+            engine.setProperty('volume', settings.voice_volume / 100.0)  # Convert to 0-1 range
             
-            # Clean up the temporary file
+            # Try to find and set a good voice
+            voices = engine.getProperty('voices')
+            if voices:
+                # Look for a female voice first (like Zira), then fall back to first available
+                female_voice = None
+                for v in voices:
+                    if 'female' in v.name.lower() or 'zira' in v.name.lower():
+                        female_voice = v
+                        break
+                
+                if female_voice:
+                    engine.setProperty('voice', female_voice.id)
+                else:
+                    engine.setProperty('voice', voices[0].id)
+            
+            # Save to file instead of speaking
+            engine.setProperty('output', output_file)
+            engine.say(text)
+            engine.runAndWait()
+            
+            # Force cleanup
             try:
-                os.unlink(script_path)
+                engine.stop()
             except:
                 pass
             
             return {
                 "success": True,
                 "text": text,
-                "voice": "zira",
+                "voice": voice,
                 "output_file": output_file,
-                "model": "windows_tts"
+                "model": "pyttsx3"
             }
         except Exception as e:
-            raise RuntimeError(f"Windows TTS conversion failed: {e}")
+            raise RuntimeError(f"pyttsx3 TTS conversion failed: {e}")
     
     def get_parameters_schema(self) -> Dict[str, Any]:
         """Get parameters schema."""
