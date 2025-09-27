@@ -416,7 +416,7 @@ class ChatBox(QWidget):
         self.close_chatbox()
     
     def add_message(self, message: str, is_user: bool, timestamp: str = None):
-        """Add a message to the chat."""
+        """Add a message to the chat with optimized real-time updates."""
         if not timestamp:
             timestamp = datetime.now().strftime("%H:%M")
         
@@ -438,18 +438,17 @@ class ChatBox(QWidget):
         # Also store in persistent history for long-term storage
         self.conversation_history.append(message_data)
         
-        # Force immediate UI update
-        self.messages_widget.update()
-        self.scroll_area.update()
-        self.update()
-        
-        # Scroll to bottom immediately
+        # Optimized immediate UI update - like awsmarthome
         self.scroll_to_bottom()
         
-        # Process events to ensure UI updates are rendered
+        # Force immediate repaint for real-time feel
+        self.messages_widget.repaint()
+        self.scroll_area.repaint()
+        
+        # Process events immediately for responsiveness
         QApplication.processEvents()
         
-        # Save history (non-blocking)
+        # Save history asynchronously to avoid blocking
         QTimer.singleShot(0, self.save_conversation_history)
     
     def send_message(self):
@@ -461,14 +460,11 @@ class ChatBox(QWidget):
             self.text_input.clear()
     
     def scroll_to_bottom(self):
-        """Scroll to the bottom of the messages."""
+        """Optimized scroll to bottom for real-time performance."""
         scrollbar = self.scroll_area.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
-        # Force immediate update and repaint
-        self.scroll_area.update()
+        # Immediate repaint for responsiveness
         self.scroll_area.repaint()
-        # Process events to ensure scrolling is rendered
-        QApplication.processEvents()
     
     def load_conversation_history(self):
         """Load conversation history from file (for persistent storage only)."""

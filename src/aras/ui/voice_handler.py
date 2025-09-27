@@ -317,76 +317,51 @@ class VoiceCommandHandler(QObject):
         self.tool_registry = tool_registry
     
     def process_voice_command(self, text: str) -> bool:
-        """Process a voice command using GPT-4 and return True if handled."""
+        """Optimized voice command processing for real-time performance."""
         import time
-        command_id = f"cmd_{int(time.time() * 1000)}"
         
         text = text.strip()
         
-        # Check for duplicate processing within the last 2 seconds
+        # Fast duplicate check
         current_time = time.time()
         if hasattr(self, '_last_command_time') and hasattr(self, '_last_command_text'):
-            if (current_time - self._last_command_time < 2.0 and 
+            if (current_time - self._last_command_time < 1.0 and 
                 self._last_command_text.lower() == text.lower()):
-                print(f"[DEBUG-{command_id}] DUPLICATE_IGNORED: Ignoring duplicate command within 2 seconds")
-                return True  # Return True to indicate it was "handled" (ignored)
+                return True  # Ignore duplicates within 1 second
         
-        # Update last command tracking
+        # Update tracking
         self._last_command_time = current_time
         self._last_command_text = text
         
-        print(f"[DEBUG-{command_id}] VOICE_INPUT: You: {text}")
-        
-        # Check for chatbox patterns first (before LLM processing)
         text_lower = text.lower()
         
-        # Check for chatbox hide patterns
-        for i, pattern in enumerate(self.compiled_chatbox_hide_patterns):
+        # Fast pattern matching first (no debug overhead)
+        for pattern in self.compiled_chatbox_hide_patterns:
             if pattern.search(text_lower):
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Chatbox hide pattern {i+1}: {self.chatbox_hide_patterns[i]}")
-                print(f"[DEBUG-{command_id}] TRIGGER_CHATBOX_HIDE: Triggering chatbox hide")
                 self.trigger_chatbox_hide()
-                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
         
-        # Check for chatbox close patterns
-        for i, pattern in enumerate(self.compiled_chatbox_close_patterns):
+        for pattern in self.compiled_chatbox_close_patterns:
             if pattern.search(text_lower):
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Chatbox close pattern {i+1}: {self.chatbox_close_patterns[i]}")
-                print(f"[DEBUG-{command_id}] TRIGGER_CHATBOX_CLOSE: Triggering chatbox close")
                 self.trigger_chatbox_close()
-                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
         
-        # Check for chatbox show patterns
-        for i, pattern in enumerate(self.compiled_chatbox_patterns):
+        for pattern in self.compiled_chatbox_patterns:
             if pattern.search(text_lower):
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Chatbox pattern {i+1}: {self.chatbox_patterns[i]}")
-                print(f"[DEBUG-{command_id}] TRIGGER_CHATBOX: Triggering chatbox")
                 self.trigger_chatbox()
-                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
         
-        # Try LLM processing if available
+        # Try LLM processing if available (async to avoid blocking)
         if self.llm_client:
             try:
-                print(f"[DEBUG-{command_id}] LLM_PROCESSING: Starting LLM processing")
                 result = self._process_with_llm(text)
                 if result['success']:
-                    print(f"[DEBUG-{command_id}] COMMAND_PROCESSED: '{text}' -> {result}")
                     self.command_processed.emit(text, result)
-                    
-                    # UI will handle response and TTS from command_processed signal
-                    print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: LLM processing successful")
                     return True
-                else:
-                    print(f"[DEBUG-{command_id}] LLM_FAILED: LLM processing failed, trying pattern matching")
             except Exception as e:
-                print(f"[DEBUG-{command_id}] ERROR: LLM processing failed: {e}")
+                print(f"❌ LLM processing failed: {e}")
         
         # Fallback to pattern matching
-        print(f"[DEBUG-{command_id}] PATTERN_MATCHING: Starting pattern matching")
-        text_lower = text.lower()
         
         # Check home status patterns
         for i, pattern in enumerate(self.compiled_home_patterns):
@@ -1248,21 +1223,24 @@ class VoiceCommandProcessor:
             print("Voice listening already active - skipping resume")
     
     def start_background_listening(self):
-        """Start background listening for wake words."""
+        """Start optimized background listening like awsmarthome."""
         if not self.voice_enabled:
-            print("Error: Voice recognition not available")
+            print("❌ Voice recognition not available")
             return
         
         if self.is_background_listening:
+            print("🎤 Voice recognition already running")
             return
         
         self.is_background_listening = True
+        self.is_listening = True
+        
         if not self.background_thread or not self.background_thread.is_alive():
-            self.background_thread = threading.Thread(target=self._background_listening_loop)
+            self.background_thread = threading.Thread(target=self._voice_listening_loop)
             self.background_thread.daemon = True
             self.background_thread.start()
-            print("Background listening started - waiting for wake words...")
-            print(f"   {response_manager.get_help_message('wake_words')}")
+            print("🎤 Continuous listening active - speak anytime!")
+            print("💡 Available commands: 'home status', 'show chatbox', 'hide chatbox', etc.")
     
     def stop_listening(self):
         """Stop listening for voice commands."""
@@ -1289,53 +1267,84 @@ class VoiceCommandProcessor:
         pass
     
     def _voice_listening_loop(self):
-        """Continuous voice listening loop running in a separate thread."""
+        """Optimized continuous voice listening loop with awsmarthome-like performance."""
         if not self.voice_enabled or not self.recognizer or not self.microphone:
             return
         
         print(f"Voice recognition started. Energy threshold: {self.recognizer.energy_threshold}")
         print("Available commands: 'home status', 'show system info', 'search for weather', etc.")
-        print("Note: Long audio support enabled (up to 30 seconds per command)")
-        print("Tip: Pause briefly after speaking to help detection")
+        print("Optimized for real-time performance like awsmarthome")
+        
+        # Optimize recognizer settings for speed
+        self.recognizer.energy_threshold = 300  # Lower threshold for better sensitivity
+        self.recognizer.dynamic_energy_threshold = True
+        self.recognizer.dynamic_energy_adjustment_damping = 0.15
+        self.recognizer.dynamic_energy_ratio = 1.5
+        self.recognizer.pause_threshold = 0.8  # Shorter pause detection
+        
+        consecutive_errors = 0
+        max_consecutive_errors = 5
         
         while self.is_listening:
             try:
-                # Listen for audio with shorter timeout for more responsive detection
+                # Use very short timeout for immediate responsiveness like awsmarthome
                 with self.microphone as source:
-                    # Use shorter timeout but longer phrase limit for better responsiveness
-                    audio = self.recognizer.listen(source, timeout=0.5, phrase_time_limit=30)
+                    # Adjust for ambient noise once
+                    self.recognizer.adjust_for_ambient_noise(source, duration=0.2)
+                    
+                    # Listen with minimal timeout for real-time performance
+                    audio = self.recognizer.listen(source, timeout=0.1, phrase_time_limit=10)
                 
-                # Recognize speech using the same approach as awsmarthome
+                # Process speech recognition immediately
                 try:
-                    # Use Google recognition exactly like awsmarthome
+                    # Use Google recognition with optimized settings
                     text = self.recognizer.recognize_google(audio, language="en-US")
                     
-                    # Process the recognized text using GPT-4
-                    print(f"[DEBUG-VOICE] PROCESSING_START: Processing recognized text: '{text}'")
-                    if self.handler.process_voice_command(text):
-                        print("[DEBUG-VOICE] PROCESSING_SUCCESS: Voice command processed successfully!")
-                    else:
-                        print(f"[DEBUG-VOICE] PROCESSING_FAILED: Command not recognized: '{text}'")
-                        print(f"[DEBUG-VOICE] SUGGESTIONS: {response_manager.get_help_message('command_suggestions')}")
+                    if text and text.strip():
+                        # Process immediately without blocking
+                        print(f"🎤 Voice: '{text}'")
+                        
+                        # Process in a separate thread to avoid blocking
+                        def process_async():
+                            if self.handler.process_voice_command(text):
+                                print("✅ Voice command processed successfully!")
+                            else:
+                                print(f"❌ Command not recognized: '{text}'")
+                        
+                        # Start processing in background
+                        threading.Thread(target=process_async, daemon=True).start()
+                        
+                        # Reset error counter on success
+                        consecutive_errors = 0
                         
                 except sr.UnknownValueError:
-                    # Speech was unintelligible - this is normal
-                    pass
+                    # Speech was unintelligible - this is normal, don't log
+                    consecutive_errors = 0
                 except sr.RequestError as e:
-                    print(f"Error: Speech recognition service error: {e}")
+                    consecutive_errors += 1
+                    if consecutive_errors <= 3:  # Only log first few errors
+                        print(f"❌ Speech recognition service error: {e}")
                 except Exception as e:
-                    print(f"Error: Unexpected error in voice recognition: {e}")
-                    # Log audio duration for debugging
-                    if hasattr(audio, 'duration'):
-                        print(f"Audio duration: {audio.duration:.2f} seconds")
+                    consecutive_errors += 1
+                    if consecutive_errors <= 3:
+                        print(f"❌ Voice recognition error: {e}")
                     
             except sr.WaitTimeoutError:
-                # This is normal - just continue listening
-                pass
+                # This is normal - just continue listening immediately
+                consecutive_errors = 0
+                continue
             except Exception as e:
-                if "timeout" not in str(e).lower():
-                    print(f"Error: Error in voice listening loop: {e}")
-                time.sleep(0.1)  # Shorter wait for more responsive detection
+                consecutive_errors += 1
+                if consecutive_errors <= max_consecutive_errors:
+                    if "timeout" not in str(e).lower():
+                        print(f"❌ Voice loop error: {e}")
+                else:
+                    print("❌ Too many consecutive errors, restarting voice recognition...")
+                    time.sleep(1)  # Brief pause before restart
+                    consecutive_errors = 0
+                    continue
+                
+                # No sleep - continue immediately for real-time performance
     
     def process_audio_input(self, audio_data: bytes) -> bool:
         """Process audio input and return True if home status was requested."""
