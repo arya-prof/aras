@@ -293,6 +293,8 @@ class HeadlessAgentWindow(QWidget):
         self.voice_processor.handler.file_operation_requested.connect(self.on_file_operation_requested)
         self.voice_processor.handler.chatbox_requested.connect(self.on_chatbox_requested)
         self.voice_processor.handler.chatbox_hide_requested.connect(self.on_chatbox_hide_requested)
+        self.voice_processor.handler.chatbox_close_requested.connect(self.on_chatbox_close_requested)
+        self.voice_processor.handler.wake_word_detected.connect(self.on_wake_word_detected)
         
         # Start background listening for wake words
         self.voice_processor.start_background_listening()
@@ -580,8 +582,15 @@ class HeadlessAgentWindow(QWidget):
         """Handle chatbox hide request from voice command."""
         print("=== CHATBOX HIDE REQUEST HANDLER ===")
         print("Chatbox hide requested via voice command")
-        self.chatbox.close_chatbox()
+        self.chatbox.hide_chatbox()
         print("=== CHATBOX HIDE REQUEST HANDLER COMPLETE ===")
+    
+    def on_chatbox_close_requested(self):
+        """Handle chatbox close request from voice command."""
+        print("=== CHATBOX CLOSE REQUEST HANDLER ===")
+        print("Chatbox close requested via voice command")
+        self.chatbox.close_chatbox()
+        print("=== CHATBOX CLOSE REQUEST HANDLER COMPLETE ===")
     
     def on_chatbox_closed(self):
         """Handle chatbox closed signal."""
@@ -592,6 +601,16 @@ class HeadlessAgentWindow(QWidget):
         print(f"Message sent from chatbox: {message}")
         # Process the message through the voice handler
         self.voice_processor.handler.process_voice_command(message)
+    
+    def on_wake_word_detected(self, wake_word: str):
+        """Handle wake word detection - start new chat session (but don't open chatbox)."""
+        print(f"=== WAKE WORD DETECTED ===")
+        print(f"Wake word: '{wake_word}' - Starting new chat session")
+        
+        # Handle wake word in chatbox (starts new session but doesn't open chatbox)
+        self.chatbox.handle_wake_word_detected(wake_word)
+        
+        print("=== WAKE WORD SESSION STARTED ===")
     
     def mousePressEvent(self, event):
         """Handle mouse press events for dragging."""

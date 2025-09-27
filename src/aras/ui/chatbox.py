@@ -141,10 +141,11 @@ class ChatBox(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.conversation_history: List[Dict[str, Any]] = []
+        self.current_session_messages: List[Dict[str, Any]] = []  # Only current session
         self.init_ui()
         self.setup_animations()
         
-        # Load conversation history
+        # Load persistent history for storage purposes only (not displayed)
         self.load_conversation_history()
     
     def init_ui(self):
@@ -410,6 +411,10 @@ class ChatBox(QWidget):
         
         self.chatbox_closed.emit()
     
+    def hide_chatbox(self):
+        """Hide the chatbox (same as close for now, but can be differentiated later)."""
+        self.close_chatbox()
+    
     def add_message(self, message: str, is_user: bool, timestamp: str = None):
         """Add a message to the chat."""
         if not timestamp:
@@ -421,13 +426,17 @@ class ChatBox(QWidget):
         # Insert before the stretch
         self.messages_layout.insertWidget(self.messages_layout.count() - 1, message_widget)
         
-        # Store in history
-        self.conversation_history.append({
+        # Store in current session only
+        message_data = {
             "message": message,
             "is_user": is_user,
             "timestamp": timestamp,
             "datetime": datetime.now().isoformat()
-        })
+        }
+        self.current_session_messages.append(message_data)
+        
+        # Also store in persistent history for long-term storage
+        self.conversation_history.append(message_data)
         
         # Save history
         self.save_conversation_history()
@@ -451,7 +460,7 @@ class ChatBox(QWidget):
         self.scroll_area.update()
     
     def load_conversation_history(self):
-        """Load conversation history from file."""
+        """Load conversation history from file (for persistent storage only)."""
         try:
             from ..config import get_data_dir
             data_dir = get_data_dir()
@@ -460,22 +469,11 @@ class ChatBox(QWidget):
             if history_file.exists():
                 with open(history_file, 'r', encoding='utf-8') as f:
                     self.conversation_history = json.load(f)
-                
-                # Display loaded messages after a short delay to ensure UI is ready
-                QTimer.singleShot(100, self._display_loaded_messages)
+            else:
+                self.conversation_history = []
         except Exception as e:
             print(f"Error loading conversation history: {e}")
             self.conversation_history = []
-    
-    def _display_loaded_messages(self):
-        """Display loaded messages from history."""
-        try:
-            for msg in self.conversation_history[-50:]:  # Show last 50 messages
-                self.add_message(msg["message"], msg["is_user"], msg["timestamp"])
-            # Ensure we scroll to bottom after loading all messages
-            QTimer.singleShot(200, self.scroll_to_bottom)
-        except Exception as e:
-            print(f"Error displaying loaded messages: {e}")
     
     def save_conversation_history(self):
         """Save conversation history to file."""
@@ -492,9 +490,20 @@ class ChatBox(QWidget):
         except Exception as e:
             print(f"Error saving conversation history: {e}")
     
+    def start_new_session(self):
+        """Start a new conversation session (clear current session messages)."""
+        print("Starting new chat session - clearing current session messages")
+        self.current_session_messages = []
+        # Clear UI messages
+        for i in reversed(range(self.messages_layout.count() - 1)):  # Keep the stretch
+            child = self.messages_layout.itemAt(i).widget()
+            if child:
+                child.deleteLater()
+    
     def clear_history(self):
         """Clear conversation history."""
         self.conversation_history = []
+        self.current_session_messages = []
         # Clear UI
         for i in reversed(range(self.messages_layout.count() - 1)):  # Keep the stretch
             child = self.messages_layout.itemAt(i).widget()
@@ -509,3 +518,28 @@ class ChatBox(QWidget):
     def add_ai_response(self, response: str):
         """Add an AI response to the chat."""
         self.add_message(response, False)
+    
+    def handle_wake_word_detected(self, wake_word: str):
+        """Handle wake word detection - start new session and optionally add wake word message."""
+        print(f"Chatbox: Wake word '{wake_word}' detected - starting new session")
+        self.start_new_session()
+        
+        # Optionally add the wake word as the first message
+        # Uncomment the next line if you want to show the wake word in chat
+        # self.add_message(f"Wake word detected: {wake_word}", True)
+    
+    def show_historical_messages(self, limit: int = 50):
+        """Show historical messages from persistent storage (optional feature)."""
+        try:
+            # Clear current session first
+            self.start_new_session()
+            
+            # Load and display historical messages
+            for msg in self.conversation_history[-limit:]:
+                self.add_message(msg["message"], msg["is_user"], msg["timestamp"])
+            
+            # Scroll to bottom
+            QTimer.singleShot(200, self.scroll_to_bottom)
+            print(f"Loaded {min(limit, len(self.conversation_history))} historical messages")
+        except Exception as e:
+            print(f"Error showing historical messages: {e}")

@@ -34,6 +34,8 @@ class VoiceCommandHandler(QObject):
     speaking_stopped = pyqtSignal()  # When TTS stops speaking
     chatbox_requested = pyqtSignal()  # When chatbox should be shown
     chatbox_hide_requested = pyqtSignal()  # When chatbox should be hidden
+    chatbox_close_requested = pyqtSignal()  # When chatbox should be closed
+    wake_word_detected = pyqtSignal(str)  # When wake word is detected (starts new session)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -265,22 +267,30 @@ class VoiceCommandHandler(QObject):
         # Chatbox hide patterns
         self.chatbox_hide_patterns = [
             r"hide.*chat",
-            r"close.*chat",
             r"hide.*chatbox",
-            r"close.*chatbox",
             r"hide.*conversation",
-            r"close.*conversation",
             r"hide.*history",
-            r"close.*history",
             r"hide.*messages",
-            r"close.*messages",
             r"minimize.*chat",
-            r"minimize.*chatbox",
+            r"minimize.*chatbox"
+        ]
+        
+        # Chatbox close patterns
+        self.chatbox_close_patterns = [
+            r"close.*chat",
+            r"close.*chatbox",
+            r"close.*conversation",
+            r"close.*history",
+            r"close.*messages",
             r"chat.*close",
             r"chatbox.*close",
             r"conversation.*close",
             r"history.*close",
-            r"messages.*close"
+            r"messages.*close",
+            r"exit.*chat",
+            r"exit.*chatbox",
+            r"quit.*chat",
+            r"quit.*chatbox"
         ]
         
         # Compile patterns for efficiency
@@ -288,6 +298,7 @@ class VoiceCommandHandler(QObject):
         self.compiled_file_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns]
         self.compiled_chatbox_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_patterns]
         self.compiled_chatbox_hide_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_hide_patterns]
+        self.compiled_chatbox_close_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_close_patterns]
     
     def set_home_status_callback(self, callback: Callable):
         """Set the callback function for home status requests."""
@@ -335,6 +346,15 @@ class VoiceCommandHandler(QObject):
                 print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Chatbox hide pattern {i+1}: {self.chatbox_hide_patterns[i]}")
                 print(f"[DEBUG-{command_id}] TRIGGER_CHATBOX_HIDE: Triggering chatbox hide")
                 self.trigger_chatbox_hide()
+                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
+                return True
+        
+        # Check for chatbox close patterns
+        for i, pattern in enumerate(self.compiled_chatbox_close_patterns):
+            if pattern.search(text_lower):
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Chatbox close pattern {i+1}: {self.chatbox_close_patterns[i]}")
+                print(f"[DEBUG-{command_id}] TRIGGER_CHATBOX_CLOSE: Triggering chatbox close")
+                self.trigger_chatbox_close()
                 print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
         
@@ -994,6 +1014,15 @@ $synth.Dispose()''')
         print("Signal emitted for chatbox hide")
         print("=== CHATBOX HIDE TRIGGER COMPLETE ===")
     
+    def trigger_chatbox_close(self):
+        """Trigger the chatbox close."""
+        print("=== CHATBOX CLOSE TRIGGER ===")
+        print("Triggering chatbox close...")
+        # Emit the signal to trigger chatbox close
+        self.chatbox_close_requested.emit()
+        print("Signal emitted for chatbox close")
+        print("=== CHATBOX CLOSE TRIGGER COMPLETE ===")
+    
     def trigger_file_operation(self, text: str, match):
         """Trigger a file operation based on voice command."""
         print(f"Triggering file operation for: '{text}'")
@@ -1398,6 +1427,9 @@ class VoiceCommandProcessor:
                     ]
                     if any(wake_word in text for wake_word in wake_words):
                         print(f"Wake word detected: '{text}'")
+                        
+                        # Emit wake word detected signal to start new session
+                        self.handler.wake_word_detected.emit(text)
                         
                         # Stop background listening (don't join thread)
                         self.is_background_listening = False
