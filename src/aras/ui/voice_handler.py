@@ -28,6 +28,7 @@ class VoiceCommandHandler(QObject):
     """Handles voice commands with GPT-4 integration and triggers appropriate actions."""
     
     home_status_requested = pyqtSignal()
+    home_viewer_requested = pyqtSignal()  # When home viewer app should be shown
     file_operation_requested = pyqtSignal(str, dict)  # operation, parameters
     command_processed = pyqtSignal(str, dict)  # command, result
     voice_response = pyqtSignal(str)  # TTS response
@@ -156,6 +157,27 @@ class VoiceCommandHandler(QObject):
             r"home.*state",
             r"house.*status",
             r"house.*state",
+            # Additional home viewer patterns
+            r"open.*home.*viewer",
+            r"show.*home.*viewer",
+            r"home.*viewer",
+            r"view.*home",
+            r"home.*control",
+            r"control.*home",
+            r"home.*dashboard",
+            r"dashboard.*home",
+            r"home.*interface",
+            r"interface.*home",
+            r"home.*panel",
+            r"panel.*home",
+            r"home.*monitor",
+            r"monitor.*home",
+            r"home.*visualization",
+            r"visualization.*home",
+            r"home.*3d",
+            r"3d.*home",
+            r"home.*2d",
+            r"2d.*home",
             # Test commands
             r"test.*voice",
             r"voice.*test",
@@ -367,6 +389,7 @@ class VoiceCommandHandler(QObject):
         # Check home status patterns
         for i, pattern in enumerate(self.compiled_home_patterns):
             if pattern.search(text_lower):
+                command_id = int(time.time() * 1000)
                 print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Home pattern {i+1}: {self.home_status_patterns[i]}")
                 print(f"[DEBUG-{command_id}] TRIGGER_HOME_STATUS: Triggering home status")
                 self.trigger_home_status()
@@ -377,6 +400,7 @@ class VoiceCommandHandler(QObject):
         for i, pattern in enumerate(self.compiled_file_patterns):
             match = pattern.search(text_lower)
             if match:
+                command_id = int(time.time() * 1000)
                 print(f"[DEBUG-{command_id}] PATTERN_MATCHED: File pattern {i+1}: {self.file_operation_patterns[i]}")
                 print(f"[DEBUG-{command_id}] TRIGGER_FILE_OPERATION: Triggering file operation")
                 self.trigger_file_operation(text, match)
@@ -384,6 +408,7 @@ class VoiceCommandHandler(QObject):
                 return True
         
         
+        command_id = int(time.time() * 1000)
         print(f"[DEBUG-{command_id}] NO_MATCH: No patterns matched for: '{text}'")
         print(f"[DEBUG-{command_id}] PROCESSING_FAILED: Command not recognized")
         return False
@@ -464,9 +489,11 @@ class VoiceCommandHandler(QObject):
                 # Execute mock Pi tool
                 asyncio.run(self._execute_pi_command(command, action_result))
             
-            # Home status requests
-            elif any(word in command_lower for word in ['home', 'status', 'devices', 'lights', 'temperature', 'climate']):
-                if any(word in command_lower for word in ['status', 'show', 'what', 'how']):
+            # Home status requests - more flexible detection
+            elif any(word in command_lower for word in ['home', 'status', 'devices', 'lights', 'temperature', 'climate', 'dashboard', 'viewer', 'control', 'panel', 'monitor', 'interface', 'visualization']):
+                # Check for home-related commands that should trigger the home viewer
+                home_trigger_words = ['status', 'show', 'what', 'how', 'dashboard', 'viewer', 'control', 'panel', 'monitor', 'interface', 'visualization', 'view', 'open', 'display']
+                if any(word in command_lower for word in home_trigger_words):
                     action_result['actions'].append({
                         'type': 'home_status',
                         'description': 'Show home status and device information'
@@ -933,7 +960,9 @@ class VoiceCommandHandler(QObject):
         print("Triggering home status visualization...")
         # Emit the signal to trigger home status
         self.home_status_requested.emit()
-        print("Signal emitted for home status")
+        # Also emit the home viewer signal to pop up the home viewer app
+        self.home_viewer_requested.emit()
+        print("Signals emitted for home status and home viewer")
     
     def trigger_chatbox(self):
         """Trigger the chatbox display."""

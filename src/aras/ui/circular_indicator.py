@@ -294,6 +294,7 @@ class HeadlessAgentWindow(QWidget):
         self.voice_processor.handler.chatbox_requested.connect(self.on_chatbox_requested)
         self.voice_processor.handler.chatbox_hide_requested.connect(self.on_chatbox_hide_requested)
         self.voice_processor.handler.chatbox_close_requested.connect(self.on_chatbox_close_requested)
+        self.voice_processor.handler.home_viewer_requested.connect(self.on_home_viewer_requested)
         self.voice_processor.handler.wake_word_detected.connect(self.on_wake_word_detected)
         
         # Start background listening for wake words
@@ -592,6 +593,13 @@ class HeadlessAgentWindow(QWidget):
         self.chatbox.close_chatbox()
         print("=== CHATBOX CLOSE REQUEST HANDLER COMPLETE ===")
     
+    def on_home_viewer_requested(self):
+        """Handle home viewer request from voice command."""
+        print("=== HOME VIEWER REQUEST HANDLER ===")
+        print("Home viewer requested via voice command")
+        self.launch_home_viewer()
+        print("=== HOME VIEWER REQUEST HANDLER COMPLETE ===")
+    
     def on_chatbox_closed(self):
         """Handle chatbox closed signal."""
         print("Chatbox closed")
@@ -601,6 +609,42 @@ class HeadlessAgentWindow(QWidget):
         print(f"Message sent from chatbox: {message}")
         # Process the message through the voice handler
         self.voice_processor.handler.process_voice_command(message)
+    
+    def launch_home_viewer(self):
+        """Launch the home viewer application."""
+        try:
+            print("=== LAUNCHING HOME VIEWER ===")
+            print("Launching home viewer application...")
+            
+            # Import the home viewer app
+            from .home_viewer_app import HomeViewerApp
+            print("✓ Home viewer app imported successfully")
+            
+            # Create and show the home viewer window
+            print("Creating home viewer window...")
+            self.home_viewer_window = HomeViewerApp()
+            print("✓ Home viewer window created")
+            
+            print("Showing home viewer window...")
+            self.home_viewer_window.show()
+            print("✓ Home viewer window shown")
+            
+            # Bring window to front
+            print("Bringing window to front...")
+            self.home_viewer_window.raise_()
+            self.home_viewer_window.activateWindow()
+            print("✓ Home viewer window brought to front")
+            
+            print("=== HOME VIEWER LAUNCHED SUCCESSFULLY ===")
+            
+        except ImportError as e:
+            print(f"❌ Error: Failed to import home viewer app: {e}")
+            print("Please ensure the home viewer dependencies are installed:")
+            print("pip install PyQt6 PyOpenGL numpy")
+        except Exception as e:
+            print(f"❌ Error launching home viewer: {e}")
+            import traceback
+            traceback.print_exc()
     
     def on_wake_word_detected(self, wake_word: str):
         """Handle wake word detection - start new chat session (but don't open chatbox)."""
