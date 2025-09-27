@@ -438,11 +438,19 @@ class ChatBox(QWidget):
         # Also store in persistent history for long-term storage
         self.conversation_history.append(message_data)
         
-        # Save history
-        self.save_conversation_history()
+        # Force immediate UI update
+        self.messages_widget.update()
+        self.scroll_area.update()
+        self.update()
         
-        # Scroll to bottom
-        QTimer.singleShot(100, self.scroll_to_bottom)
+        # Scroll to bottom immediately
+        self.scroll_to_bottom()
+        
+        # Process events to ensure UI updates are rendered
+        QApplication.processEvents()
+        
+        # Save history (non-blocking)
+        QTimer.singleShot(0, self.save_conversation_history)
     
     def send_message(self):
         """Send a message."""
@@ -456,8 +464,11 @@ class ChatBox(QWidget):
         """Scroll to the bottom of the messages."""
         scrollbar = self.scroll_area.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
-        # Force update to ensure scrolling happens
+        # Force immediate update and repaint
         self.scroll_area.update()
+        self.scroll_area.repaint()
+        # Process events to ensure scrolling is rendered
+        QApplication.processEvents()
     
     def load_conversation_history(self):
         """Load conversation history from file (for persistent storage only)."""
@@ -519,6 +530,45 @@ class ChatBox(QWidget):
         """Add an AI response to the chat."""
         self.add_message(response, False)
     
+    def add_streaming_message(self, message: str, is_user: bool = False, message_id: str = None):
+        """Add a streaming message that can be updated in real-time."""
+        if message_id is None:
+            message_id = f"stream_{datetime.now().strftime('%H%M%S%f')}"
+        
+        # Create message widget
+        message_widget = ChatMessage(message, is_user)
+        message_widget.setProperty("message_id", message_id)
+        
+        # Insert before the stretch
+        self.messages_layout.insertWidget(self.messages_layout.count() - 1, message_widget)
+        
+        # Force immediate UI update
+        self.messages_widget.update()
+        self.scroll_area.update()
+        self.update()
+        QApplication.processEvents()
+        
+        # Scroll to bottom
+        self.scroll_to_bottom()
+        
+        return message_id
+    
+    def update_streaming_message(self, message_id: str, new_content: str):
+        """Update a streaming message with new content."""
+        # Find the message widget by ID
+        for i in range(self.messages_layout.count() - 1):  # Exclude the stretch
+            widget = self.messages_layout.itemAt(i).widget()
+            if widget and widget.property("message_id") == message_id:
+                # Update the message content
+                message_label = widget.findChild(QLabel)
+                if message_label:
+                    message_label.setText(new_content)
+                    # Force immediate update
+                    widget.update()
+                    self.scroll_to_bottom()
+                    QApplication.processEvents()
+                break
+    
     def handle_wake_word_detected(self, wake_word: str):
         """Handle wake word detection - start new session and optionally add wake word message."""
         print(f"Chatbox: Wake word '{wake_word}' detected - starting new session")
@@ -535,11 +585,45 @@ class ChatBox(QWidget):
             self.start_new_session()
             
             # Load and display historical messages
-            for msg in self.conversation_history[-limit:]:
+            messages_to_load = self.conversation_history[-limit:]
+            for i, msg in enumerate(messages_to_load):
                 self.add_message(msg["message"], msg["is_user"], msg["timestamp"])
+                # Process events every 5 messages to show progress without blocking
+                if i % 5 == 0:
+                    QApplication.processEvents()
             
-            # Scroll to bottom
-            QTimer.singleShot(200, self.scroll_to_bottom)
+            # Final scroll to bottom
+            self.scroll_to_bottom()
             print(f"Loaded {min(limit, len(self.conversation_history))} historical messages")
         except Exception as e:
             print(f"Error showing historical messages: {e}")
+    
+    def add_messages_bulk(self, messages: List[Dict[str, Any]]):
+        """Add multiple messages efficiently in bulk."""
+        try:
+            for i, msg in enumerate(messages):
+                # Create message widget
+                message_widget = ChatMessage(msg["message"], msg["is_user"], msg.get("timestamp"))
+                
+                # Insert before the stretch
+                self.messages_layout.insertWidget(self.messages_layout.count() - 1, message_widget)
+                
+                # Store in current session
+                self.current_session_messages.append(msg)
+                
+                # Process events every 10 messages to maintain responsiveness
+                if i % 10 == 0:
+                    QApplication.processEvents()
+            
+            # Force final UI update
+            self.messages_widget.update()
+            self.scroll_area.update()
+            self.update()
+            QApplication.processEvents()
+            
+            # Scroll to bottom
+            self.scroll_to_bottom()
+            
+            print(f"Added {len(messages)} messages in bulk")
+        except Exception as e:
+            print(f"Error adding messages in bulk: {e}")
