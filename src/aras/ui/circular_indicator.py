@@ -276,6 +276,10 @@ class HeadlessAgentWindow(QWidget):
         from ..tools.registry import create_tool_registry
         self.tool_registry = create_tool_registry()
         
+        # Initialize all tools at startup (including Arduino BLE connection)
+        print("Initializing all tools...")
+        self.initialize_tools_async()
+        
         # Add desktop as a safe directory for file operations
         from pathlib import Path
         desktop_path = Path.home() / 'Desktop'
@@ -310,6 +314,45 @@ class HeadlessAgentWindow(QWidget):
         # Dragging properties for the main window
         self._dragging = False
         self._drag_start_position = None
+    
+    def initialize_tools_async(self):
+        """Initialize all tools asynchronously in the background."""
+        import asyncio
+        import threading
+        
+        def run_async_init():
+            """Run async initialization in a separate thread."""
+            try:
+                # Create new event loop for this thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Initialize all tools
+                results = loop.run_until_complete(self.tool_registry.initialize_all_tools())
+                
+                # Log results
+                print("Tool initialization results:")
+                for tool_name, success in results.items():
+                    status = "OK" if success else "FAIL"
+                    print(f"  {status} {tool_name}")
+                
+                # Check Arduino tool specifically
+                arduino_tool = self.tool_registry.get_tool("arduino_bluetooth_control")
+                if arduino_tool:
+                    if results.get("arduino_bluetooth_control", False):
+                        print("OK Arduino BLE connection established - voice commands will be fast!")
+                    else:
+                        print("FAIL Arduino BLE connection failed - voice commands will be slower")
+                        print("  Make sure Arduino with HC-05 BLE module is powered on and in range")
+                
+                loop.close()
+                
+            except Exception as e:
+                print(f"Error during tool initialization: {e}")
+        
+        # Start initialization in background thread
+        init_thread = threading.Thread(target=run_async_init, daemon=True)
+        init_thread.start()
     
     def position_window(self):
         """Position the window in the center of the screen."""

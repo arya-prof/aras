@@ -44,6 +44,7 @@ class VoiceCommandHandler(QObject):
         self.home_status_callback: Optional[Callable] = None
         self.file_operation_callback: Optional[Callable] = None
         self.chatbox_callback: Optional[Callable] = None
+        self.arduino_control_callback: Optional[Callable] = None
         self.openai_client = None
         self.tts_engine = None
         self.tool_registry = None  # Will be set by the UI
@@ -316,12 +317,146 @@ class VoiceCommandHandler(QObject):
             r"quit.*chatbox"
         ]
         
+        # Arduino control patterns
+        self.arduino_patterns = [
+            # Light control patterns - with numbers
+            r"turn.*on.*light.*1",
+            r"turn.*on.*l1",
+            r"light.*1.*on",
+            r"l1.*on",
+            r"switch.*on.*light.*1",
+            r"switch.*on.*l1",
+            r"enable.*light.*1",
+            r"enable.*l1",
+            
+            # Light control patterns - with words
+            r"turn.*on.*light.*one",
+            r"turn.*on.*light.*1",
+            r"light.*one.*on",
+            r"light.*1.*on",
+            r"switch.*on.*light.*one",
+            r"switch.*on.*light.*1",
+            r"enable.*light.*one",
+            r"enable.*light.*1",
+            
+            r"turn.*off.*light.*1",
+            r"turn.*off.*l1",
+            r"light.*1.*off",
+            r"l1.*off",
+            r"switch.*off.*light.*1",
+            r"switch.*off.*l1",
+            r"disable.*light.*1",
+            r"disable.*l1",
+            
+            r"turn.*off.*light.*one",
+            r"turn.*off.*light.*1",
+            r"light.*one.*off",
+            r"light.*1.*off",
+            r"switch.*off.*light.*one",
+            r"switch.*off.*light.*1",
+            r"disable.*light.*one",
+            r"disable.*light.*1",
+            
+            r"turn.*on.*light.*2",
+            r"turn.*on.*l2",
+            r"light.*2.*on",
+            r"l2.*on",
+            r"switch.*on.*light.*2",
+            r"switch.*on.*l2",
+            r"enable.*light.*2",
+            r"enable.*l2",
+            
+            r"turn.*on.*light.*two",
+            r"turn.*on.*light.*2",
+            r"light.*two.*on",
+            r"light.*2.*on",
+            r"switch.*on.*light.*two",
+            r"switch.*on.*light.*2",
+            r"enable.*light.*two",
+            r"enable.*light.*2",
+            
+            r"turn.*off.*light.*2",
+            r"turn.*off.*l2",
+            r"light.*2.*off",
+            r"l2.*off",
+            r"switch.*off.*light.*2",
+            r"switch.*off.*l2",
+            r"disable.*light.*2",
+            r"disable.*l2",
+            
+            r"turn.*off.*light.*two",
+            r"turn.*off.*light.*2",
+            r"light.*two.*off",
+            r"light.*2.*off",
+            r"switch.*off.*light.*two",
+            r"switch.*off.*light.*2",
+            r"disable.*light.*two",
+            r"disable.*light.*2",
+            
+            # Toggle patterns
+            r"toggle.*light.*1",
+            r"toggle.*l1",
+            r"switch.*light.*1",
+            r"switch.*l1",
+            
+            r"toggle.*light.*2",
+            r"toggle.*l2",
+            r"switch.*light.*2",
+            r"switch.*l2",
+            
+            # All lights control
+            r"turn.*on.*all.*lights",
+            r"turn.*on.*all.*light",
+            r"all.*lights.*on",
+            r"all.*light.*on",
+            r"switch.*on.*all.*lights",
+            r"switch.*on.*all.*light",
+            r"enable.*all.*lights",
+            r"enable.*all.*light",
+            r"lights.*on",
+            r"light.*on",
+            
+            r"turn.*off.*all.*lights",
+            r"turn.*off.*all.*light",
+            r"all.*lights.*off",
+            r"all.*light.*off",
+            r"switch.*off.*all.*lights",
+            r"switch.*off.*all.*light",
+            r"disable.*all.*lights",
+            r"disable.*all.*light",
+            r"lights.*off",
+            r"light.*off",
+            
+            # Arduino status
+            r"arduino.*status",
+            r"arduino.*state",
+            r"arduino.*info",
+            r"arduino.*ping",
+            r"bluetooth.*status",
+            r"bluetooth.*state",
+            r"device.*status",
+            r"device.*state",
+            r"controller.*status",
+            r"controller.*state",
+            
+            # General Arduino control
+            r"arduino.*control",
+            r"arduino.*command",
+            r"bluetooth.*control",
+            r"bluetooth.*command",
+            r"device.*control",
+            r"device.*command",
+            r"controller.*control",
+            r"controller.*command"
+        ]
+        
         # Compile patterns for efficiency
         self.compiled_home_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns]
         self.compiled_file_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns]
         self.compiled_chatbox_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_patterns]
         self.compiled_chatbox_hide_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_hide_patterns]
         self.compiled_chatbox_close_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_close_patterns]
+        self.compiled_arduino_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.arduino_patterns]
     
     def set_home_status_callback(self, callback: Callable):
         """Set the callback function for home status requests."""
@@ -338,6 +473,10 @@ class VoiceCommandHandler(QObject):
     def set_tool_registry(self, tool_registry):
         """Set the tool registry for executing tools."""
         self.tool_registry = tool_registry
+    
+    def set_arduino_control_callback(self, callback: Callable):
+        """Set the callback function for Arduino control requests."""
+        self.arduino_control_callback = callback
     
     def process_voice_command(self, text: str) -> bool:
         """Optimized voice command processing for real-time performance."""
@@ -374,6 +513,17 @@ class VoiceCommandHandler(QObject):
                 self.trigger_chatbox()
                 return True
         
+        # Check Arduino control patterns FIRST (before LLM)
+        for i, pattern in enumerate(self.compiled_arduino_patterns):
+            match = pattern.search(text_lower)
+            if match:
+                command_id = int(time.time() * 1000)
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Arduino pattern {i+1}: {self.arduino_patterns[i]}")
+                print(f"[DEBUG-{command_id}] TRIGGER_ARDUINO_CONTROL: Triggering Arduino control")
+                self.trigger_arduino_control(text, match)
+                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
+                return True
+        
         # Try LLM processing if available (async to avoid blocking)
         if self.llm_client:
             try:
@@ -382,7 +532,7 @@ class VoiceCommandHandler(QObject):
                     self.command_processed.emit(text, result)
                     return True
             except Exception as e:
-                print(f"❌ LLM processing failed: {e}")
+                print(f"[ERROR] LLM processing failed: {e}")
         
         # Fallback to pattern matching
         
@@ -406,6 +556,7 @@ class VoiceCommandHandler(QObject):
                 self.trigger_file_operation(text, match)
                 print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
+        
         
         
         command_id = int(time.time() * 1000)
@@ -1096,6 +1247,135 @@ class VoiceCommandHandler(QObject):
         else:
             print("Could not determine file operation type")
             self.speak_response(response_manager.get_error_response('file_operation_unknown'))
+    
+    def trigger_arduino_control(self, text: str, match):
+        """Trigger Arduino control based on voice command."""
+        print(f"Triggering Arduino control for: '{text}'")
+        
+        text_lower = text.lower()
+        operation = None
+        parameters = {}
+        
+        # Light 1 control
+        if any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
+            operation = "control_light"
+            parameters = {
+                "operation": "control_light",
+                "light_id": "L1",
+                "state": True
+            }
+        elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
+            operation = "control_light"
+            parameters = {
+                "operation": "control_light",
+                "light_id": "L1",
+                "state": False
+            }
+        elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['toggle', 'switch']):
+            operation = "toggle_light"
+            parameters = {
+                "operation": "toggle_light",
+                "light_id": "L1"
+            }
+        
+        # Light 2 control
+        elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
+            operation = "control_light"
+            parameters = {
+                "operation": "control_light",
+                "light_id": "L2",
+                "state": True
+            }
+        elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
+            operation = "control_light"
+            parameters = {
+                "operation": "control_light",
+                "light_id": "L2",
+                "state": False
+            }
+        elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['toggle', 'switch']):
+            operation = "toggle_light"
+            parameters = {
+                "operation": "toggle_light",
+                "light_id": "L2"
+            }
+        
+        # All lights control
+        elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
+            operation = "control_all_lights"
+            parameters = {
+                "operation": "control_all_lights",
+                "state": True
+            }
+        elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
+            operation = "control_all_lights"
+            parameters = {
+                "operation": "control_all_lights",
+                "state": False
+            }
+        
+        # Arduino status
+        elif any(word in text_lower for word in ['arduino', 'bluetooth', 'device', 'controller']) and any(word in text_lower for word in ['status', 'state', 'info', 'ping']):
+            operation = "get_status"
+            parameters = {
+                "operation": "get_status"
+            }
+        
+        # Ping
+        elif any(word in text_lower for word in ['ping', 'test']):
+            operation = "ping"
+            parameters = {
+                "operation": "ping"
+            }
+        
+        if operation:
+            print(f"Arduino operation: {operation} with parameters: {parameters}")
+            # Execute Arduino control using tool registry
+            if self.tool_registry:
+                try:
+                    # Get the Arduino Bluetooth tool
+                    arduino_tool = self.tool_registry.get_tool("arduino_bluetooth_control")
+                    if arduino_tool:
+                        # Execute the operation asynchronously
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            result = loop.run_until_complete(arduino_tool.execute(parameters))
+                            print(f"Arduino control result: {result}")
+                            
+                            # Provide feedback via TTS
+                            if result.get('success'):
+                                if operation == "control_light":
+                                    light_id = parameters.get('light_id', 'light')
+                                    state = "on" if parameters.get('state') else "off"
+                                    self.speak_response(f"Turned {light_id} {state}")
+                                elif operation == "toggle_light":
+                                    light_id = parameters.get('light_id', 'light')
+                                    self.speak_response(f"Toggled {light_id}")
+                                elif operation == "control_all_lights":
+                                    state = "on" if parameters.get('state') else "off"
+                                    self.speak_response(f"Turned all lights {state}")
+                                elif operation == "get_status":
+                                    self.speak_response("Arduino status retrieved")
+                                elif operation == "ping":
+                                    self.speak_response("Arduino ping successful")
+                            else:
+                                self.speak_response("Arduino control failed")
+                        finally:
+                            loop.close()
+                    else:
+                        print("Arduino Bluetooth tool not found in registry")
+                        self.speak_response("Arduino control not available")
+                except Exception as e:
+                    print(f"Error executing Arduino control: {e}")
+                    self.speak_response(f"Arduino control error: {str(e)}")
+            else:
+                print("Tool registry not available")
+                self.speak_response("Arduino control not available")
+        else:
+            print("Could not determine Arduino operation type")
+            self.speak_response("Arduino command not recognized")
 
 
 class VoiceCommandProcessor:
@@ -1218,11 +1498,11 @@ class VoiceCommandProcessor:
     def start_background_listening(self):
         """Start optimized background listening like awsmarthome."""
         if not self.voice_enabled:
-            print("❌ Voice recognition not available")
+            print("[ERROR] Voice recognition not available")
             return
         
         if self.is_background_listening:
-            print("🎤 Voice recognition already running")
+            print("[MIC] Voice recognition already running")
             return
         
         self.is_background_listening = True
@@ -1232,8 +1512,8 @@ class VoiceCommandProcessor:
             self.background_thread = threading.Thread(target=self._voice_listening_loop)
             self.background_thread.daemon = True
             self.background_thread.start()
-            print("🎤 Continuous listening active - speak anytime!")
-            print("💡 Available commands: 'home status', 'show chatbox', 'hide chatbox', etc.")
+            print("[MIC] Continuous listening active - speak anytime!")
+            print("[INFO] Available commands: 'home status', 'show chatbox', 'hide chatbox', etc.")
     
     def stop_listening(self):
         """Stop listening for voice commands."""
@@ -1295,14 +1575,14 @@ class VoiceCommandProcessor:
                     
                     if text and text.strip():
                         # Process immediately without blocking
-                        print(f"🎤 Voice: '{text}'")
+                        print(f"[MIC] Voice: '{text}'")
                         
                         # Process in a separate thread to avoid blocking
                         def process_async():
                             if self.handler.process_voice_command(text):
-                                print("✅ Voice command processed successfully!")
+                                print("[SUCCESS] Voice command processed successfully!")
                             else:
-                                print(f"❌ Command not recognized: '{text}'")
+                                print(f"[ERROR] Command not recognized: '{text}'")
                         
                         # Start processing in background
                         threading.Thread(target=process_async, daemon=True).start()
@@ -1316,11 +1596,11 @@ class VoiceCommandProcessor:
                 except sr.RequestError as e:
                     consecutive_errors += 1
                     if consecutive_errors <= 3:  # Only log first few errors
-                        print(f"❌ Speech recognition service error: {e}")
+                        print(f"[ERROR] Speech recognition service error: {e}")
                 except Exception as e:
                     consecutive_errors += 1
                     if consecutive_errors <= 3:
-                        print(f"❌ Voice recognition error: {e}")
+                        print(f"[ERROR] Voice recognition error: {e}")
                     
             except sr.WaitTimeoutError:
                 # This is normal - just continue listening immediately
@@ -1330,9 +1610,9 @@ class VoiceCommandProcessor:
                 consecutive_errors += 1
                 if consecutive_errors <= max_consecutive_errors:
                     if "timeout" not in str(e).lower():
-                        print(f"❌ Voice loop error: {e}")
+                        print(f"[ERROR] Voice loop error: {e}")
                 else:
-                    print("❌ Too many consecutive errors, restarting voice recognition...")
+                    print("[ERROR] Too many consecutive errors, restarting voice recognition...")
                     time.sleep(1)  # Brief pause before restart
                     consecutive_errors = 0
                     continue
