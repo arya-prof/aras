@@ -3,10 +3,12 @@ Main PyQt6 application for 3D and 2D home visualization.
 """
 
 import sys
+import asyncio
+import logging
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy, QTabWidget,
                             QDialog, QCheckBox, QSpinBox, QComboBox, QGroupBox)
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QAction
 
 try:
@@ -17,16 +19,89 @@ except ImportError:
     from home_3d_viewer import Home3DViewer
     from home_2d_viewer import Home2DViewer
 
+# Import Arduino Bluetooth tool
+try:
+    from ..tools.arduino_bluetooth_tool import ArduinoBluetoothTool
+    ARDUINO_TOOL_AVAILABLE = True
+except ImportError:
+    ARDUINO_TOOL_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
+
+
+class ArduinoToolThread(QThread):
+    """Thread for running Arduino tool operations without blocking the UI."""
+    
+    connection_status_changed = pyqtSignal(bool, str)  # connected, status
+    device_state_changed = pyqtSignal(str, bool)  # device_id, state
+    
+    def __init__(self, arduino_tool):
+        super().__init__()
+        self.arduino_tool = arduino_tool
+        self.running = True
+    
+    def run(self):
+        """Run the Arduino tool in a separate thread."""
+        try:
+            # Initialize the Arduino tool
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Setup the tool
+            loop.run_until_complete(self.arduino_tool._setup_resources())
+            
+            # Check if tool is enabled
+            if self.arduino_tool.enabled:
+                self.connection_status_changed.emit(True, "Connected")
+                logger.info("Arduino tool connected successfully")
+            else:
+                self.connection_status_changed.emit(False, "Disconnected - Tool disabled")
+                logger.warning("Arduino tool is disabled")
+            
+            # Keep the thread alive and monitor connection
+            while self.running:
+                if self.arduino_tool.enabled and self.arduino_tool.client and self.arduino_tool.client.is_connected:
+                    # Tool is connected
+                    pass
+                else:
+                    # Tool is disconnected
+                    self.connection_status_changed.emit(False, "Disconnected")
+                
+                # Sleep for a bit to avoid busy waiting
+                self.msleep(1000)
+                
+        except Exception as e:
+            logger.error(f"Arduino tool thread error: {e}")
+            self.connection_status_changed.emit(False, f"Error: {str(e)}")
+        finally:
+            # Cleanup
+            if self.arduino_tool:
+                try:
+                    loop.run_until_complete(self.arduino_tool._cleanup_resources())
+                except:
+                    pass
+    
+    def stop(self):
+        """Stop the thread."""
+        self.running = False
+        self.quit()
+        self.wait()
+
 
 class HomeViewerApp(QMainWindow):
     """Main application window for home visualization."""
     
-    def __init__(self):
+    def __init__(self, arduino_tool=None):
         super().__init__()
         
         # Window properties
         self.setWindowTitle("ARAS Home Viewer - 3D & 2D Visualization")
         self.setGeometry(100, 100, 1400, 900)
+        
+        # Initialize Arduino tool (use provided instance or create new one)
+        self.arduino_tool = arduino_tool
+        self.arduino_connected = False
+        self.arduino_connection_status = "Disconnected"
         
         # Initialize UI
         self.init_ui()
@@ -43,13 +118,88 @@ class HomeViewerApp(QMainWindow):
         self.sync_views = True
         self.current_room = None
         
-        # Device states (lights + TVs + ACs)
-        self.device_states = [False] * 22  # 17 lights + 2 TVs + 3 ACs, all initially off
+        # Device states - Updated to match Arduino tool (L1, L2)
+        self.device_states = {"L1": False, "L2": False}  # Real Arduino devices
         self.light_states = self.device_states  # Keep compatibility with existing code
         
         # Camera states
         self.camera_states = [False] * 2  # 2 cameras, all initially off
         self.recording_states = [False] * 2  # 2 recording states, all initially off
+        
+        # Initialize Arduino tool
+        self.init_arduino_tool()
+        
+        # Setup connection monitoring timer for shared Arduino tool
+        if self.arduino_tool is not None:
+            self.connection_timer = QTimer()
+            self.connection_timer.timeout.connect(self.check_arduino_connection)
+            self.connection_timer.start(2000)  # Check every 2 seconds
+    
+    def init_arduino_tool(self):
+        """Initialize the Arduino Bluetooth tool."""
+        if self.arduino_tool is not None:
+            # Use the provided Arduino tool instance
+            logger.info("Using provided Arduino tool instance")
+            self.arduino_connected = self.arduino_tool.enabled and self.arduino_tool.client and self.arduino_tool.client.is_connected
+            if self.arduino_connected:
+                self.arduino_connection_status = "Connected (shared)"
+            else:
+                self.arduino_connection_status = "Disconnected (shared)"
+            self.update_arduino_status_display()
+        elif ARDUINO_TOOL_AVAILABLE:
+            try:
+                # Create new Arduino tool only if none provided
+                self.arduino_tool = ArduinoBluetoothTool()
+                # Start the tool in a separate thread to avoid blocking UI
+                self.arduino_thread = ArduinoToolThread(self.arduino_tool)
+                self.arduino_thread.connection_status_changed.connect(self.on_arduino_connection_changed)
+                self.arduino_thread.device_state_changed.connect(self.on_arduino_device_state_changed)
+                self.arduino_thread.start()
+                logger.info("Arduino tool initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize Arduino tool: {e}")
+                self.arduino_tool = None
+        else:
+            logger.warning("Arduino tool not available - running in simulation mode")
+            self.arduino_tool = None
+    
+    def on_arduino_connection_changed(self, connected: bool, status: str):
+        """Handle Arduino connection status changes."""
+        self.arduino_connected = connected
+        self.arduino_connection_status = status
+        self.update_arduino_status_display()
+    
+    def on_arduino_device_state_changed(self, device_id: str, state: bool):
+        """Handle Arduino device state changes."""
+        if device_id in self.device_states:
+            self.device_states[device_id] = state
+            self.update_device_button(device_id)
+            self.update_device_status()
+    
+    def check_arduino_connection(self):
+        """Check Arduino connection status for shared tool."""
+        if self.arduino_tool is not None:
+            was_connected = self.arduino_connected
+            self.arduino_connected = self.arduino_tool.enabled and self.arduino_tool.client and self.arduino_tool.client.is_connected
+            
+            if self.arduino_connected:
+                self.arduino_connection_status = "Connected (shared)"
+            else:
+                self.arduino_connection_status = "Disconnected (shared)"
+            
+            # Update display if connection status changed
+            if was_connected != self.arduino_connected:
+                self.update_arduino_status_display()
+    
+    def update_arduino_status_display(self):
+        """Update the Arduino status display in the UI."""
+        if hasattr(self, 'arduino_status_label'):
+            if self.arduino_connected:
+                self.arduino_status_label.setText(f"Arduino: {self.arduino_connection_status}")
+                self.arduino_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            else:
+                self.arduino_status_label.setText(f"Arduino: {self.arduino_connection_status}")
+                self.arduino_status_label.setStyleSheet("color: #f44336; font-weight: bold;")
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -115,30 +265,25 @@ class HomeViewerApp(QMainWindow):
     
     def initialize_device_controls(self):
         """Initialize device controls and room layout."""
-        # Define room layout with device assignments
+        # Define room layout with device assignments - Updated for Arduino devices
         self.room_layout = {
-            "Bedroom 1": [0, 1, 2, 19],  # L1, L2, L3, AC1
-            "Bedroom 2": [3, 4, 5],      # L4, L5, L6
-            "Bedroom 3": [6, 7, 8, 17, 20],  # L7, L8, L9, TV1, AC2
-            "Kitchen": [9, 10],          # L10, L11
-            "Living Room": [11, 12, 13, 18, 21], # L12, L13, L14, TV2, AC3
-            "Bathroom": [14],            # L15
-            "Outside": [15, 16]          # L16, L17
+            "Bedroom 1": ["L1"],         # L1 (Arduino controlled)
+            "Living Room": ["L2"],       # L2 (Arduino controlled)
+            "Kitchen": [],               # No Arduino devices
+            "Bathroom": [],              # No Arduino devices
+            "Outside": []                # No Arduino devices
         }
         
-        # Device type mapping
+        # Device type mapping - Only Arduino devices
         self.device_types = {
-            17: "TV",   # TV1 in Bedroom 3
-            18: "TV",   # TV2 in Living Room
-            19: "AC",   # AC1 in Bedroom 1
-            20: "AC",   # AC2 in Bedroom 3
-            21: "AC"    # AC3 in Living Room
+            "L1": "Light",   # L1 in Bedroom 1
+            "L2": "Light"    # L2 in Living Room
         }
         
-        # Create 22 device controls (17 lights + 2 TVs + 3 ACs)
-        self.light_buttons = []
-        self.light_labels = []
-        for i in range(22):
+        # Create device controls for Arduino devices only
+        self.light_buttons = {}
+        self.light_labels = {}
+        for device_id in ["L1", "L2"]:
             # Create button
             btn = QPushButton()
             btn.setMinimumSize(60, 25)
@@ -146,10 +291,10 @@ class HomeViewerApp(QMainWindow):
             btn.setText("OFF")
             btn.setCheckable(True)
             btn.setStyleSheet(self.get_light_button_style(False))
-            btn.clicked.connect(lambda checked, idx=i: self.toggle_light(idx))
+            btn.clicked.connect(lambda checked, dev_id=device_id: self.toggle_light(dev_id))
             
-            self.light_buttons.append(btn)
-            self.light_labels.append(None)  # Will be set per room
+            self.light_buttons[device_id] = btn
+            self.light_labels[device_id] = None  # Will be set per room
     
     def create_view_switcher(self, parent_layout):
         """Create the view switcher (status only)."""
@@ -233,15 +378,13 @@ class HomeViewerApp(QMainWindow):
             }
         """)
         
-        # Create room-based tabs
+        # Create room-based tabs - Updated for Arduino devices
         self.create_overview_tab()
-        self.create_room_tab("Bedroom 1", [0, 1, 2, 19])  # L1, L2, L3, AC1
-        self.create_room_tab("Bedroom 2", [3, 4, 5])      # L4, L5, L6
-        self.create_room_tab("Bedroom 3", [6, 7, 8, 17, 20])  # L7, L8, L9, TV1, AC2
-        self.create_room_tab("Kitchen", [9, 10])          # L10, L11
-        self.create_room_tab("Living Room", [11, 12, 13, 18, 21]) # L12, L13, L14, TV2, AC3
-        self.create_room_tab("Bathroom", [14])            # L15
-        self.create_room_tab("Outside", [15, 16])         # L16, L17
+        self.create_room_tab("Bedroom 1", ["L1"])         # L1 (Arduino controlled)
+        self.create_room_tab("Living Room", ["L2"])       # L2 (Arduino controlled)
+        self.create_room_tab("Kitchen", [])               # No Arduino devices
+        self.create_room_tab("Bathroom", [])              # No Arduino devices
+        self.create_room_tab("Outside", [])               # No Arduino devices
         self.create_security_cameras_tab()
         
         parent_layout.addWidget(self.tab_widget)
@@ -286,13 +429,23 @@ class HomeViewerApp(QMainWindow):
         global_controls_layout.addWidget(all_off_btn)
         
         # Device status
-        self.device_count_label = QLabel("0/22 devices ON")
+        self.device_count_label = QLabel("0/2 devices ON")
         self.device_count_label.setStyleSheet("""
             font-size: 14px;
             color: #cccccc;
             padding: 5px 0px;
         """)
         global_controls_layout.addWidget(self.device_count_label)
+        
+        # Arduino status
+        self.arduino_status_label = QLabel("Arduino: Disconnected")
+        self.arduino_status_label.setStyleSheet("""
+            font-size: 12px;
+            color: #f44336;
+            font-weight: bold;
+            padding: 5px 0px;
+        """)
+        global_controls_layout.addWidget(self.arduino_status_label)
         global_controls_layout.addStretch()
         
         overview_layout.addLayout(global_controls_layout)
@@ -327,7 +480,7 @@ class HomeViewerApp(QMainWindow):
         
         self.tab_widget.addTab(overview_tab, "Overview")
     
-    def create_room_tab(self, room_name, device_indices):
+    def create_room_tab(self, room_name, device_ids):
         """Create a tab for a specific room with its devices."""
         room_tab = QWidget()
         room_tab.setStyleSheet("""
@@ -353,22 +506,26 @@ class HomeViewerApp(QMainWindow):
         room_controls_layout = QHBoxLayout()
         room_controls_layout.setSpacing(8)
         
-        # Room on/off buttons
-        room_on_btn = QPushButton("Room ON")
-        room_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        room_on_btn.setStyleSheet(self.get_scene_button_style())
-        room_on_btn.clicked.connect(lambda: self.room_lights_on(room_name))
-        room_controls_layout.addWidget(room_on_btn)
-        
-        room_off_btn = QPushButton("Room OFF")
-        room_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        room_off_btn.setStyleSheet(self.get_scene_button_style())
-        room_off_btn.clicked.connect(lambda: self.room_lights_off(room_name))
-        room_controls_layout.addWidget(room_off_btn)
+        # Room on/off buttons (only if room has devices)
+        if device_ids:
+            room_on_btn = QPushButton("Room ON")
+            room_on_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            room_on_btn.setStyleSheet(self.get_scene_button_style())
+            room_on_btn.clicked.connect(lambda: self.room_lights_on(room_name))
+            room_controls_layout.addWidget(room_on_btn)
+            
+            room_off_btn = QPushButton("Room OFF")
+            room_off_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            room_off_btn.setStyleSheet(self.get_scene_button_style())
+            room_off_btn.clicked.connect(lambda: self.room_lights_off(room_name))
+            room_controls_layout.addWidget(room_off_btn)
         
         # Room device count
-        room_device_count = len(device_indices)
-        room_status_label = QLabel(f"{room_device_count} devices in this room")
+        room_device_count = len(device_ids)
+        if room_device_count > 0:
+            room_status_label = QLabel(f"{room_device_count} device{'s' if room_device_count > 1 else ''} in this room")
+        else:
+            room_status_label = QLabel("No Arduino devices in this room")
         room_status_label.setStyleSheet("""
             font-size: 12px;
             color: #cccccc;
@@ -380,45 +537,47 @@ class HomeViewerApp(QMainWindow):
         room_layout.addLayout(room_controls_layout)
         
         # Room devices
-        devices_header = QLabel("Devices")
-        devices_header.setStyleSheet("""
-            font-size: 12px;
-            font-weight: bold;
-            color: #ffffff;
-            padding: 10px 0px 4px 0px;
-        """)
-        room_layout.addWidget(devices_header)
-        
-        # Create device controls for this room
-        for i, device_idx in enumerate(device_indices):
-            device_row = QHBoxLayout()
-            device_row.setSpacing(8)
-            
-            # Determine device type and global number
-            device_type = self.device_types.get(device_idx, "L")
-            if device_type == "TV":
-                global_label = f"TV{device_idx-16}"
-            elif device_type == "AC":
-                global_label = f"AC{device_idx-18}"
-            else:
-                global_label = f"L{device_idx+1}"
-            
-            # Device label
-            device_label = QLabel(f"{global_label} ({i+1}):")
-            device_label.setStyleSheet("""
+        if device_ids:
+            devices_header = QLabel("Devices")
+            devices_header.setStyleSheet("""
                 font-size: 12px;
-                color: #cccccc;
                 font-weight: bold;
-                min-width: 60px;
+                color: #ffffff;
+                padding: 10px 0px 4px 0px;
             """)
-            device_row.addWidget(device_label)
+            room_layout.addWidget(devices_header)
             
-            # Device button
-            device_btn = self.light_buttons[device_idx]
-            device_row.addWidget(device_btn)
-            device_row.addStretch()
-            
-            room_layout.addLayout(device_row)
+            # Create device controls for this room
+            for i, device_id in enumerate(device_ids):
+                device_row = QHBoxLayout()
+                device_row.setSpacing(8)
+                
+                # Device label
+                device_label = QLabel(f"{device_id}:")
+                device_label.setStyleSheet("""
+                    font-size: 12px;
+                    color: #cccccc;
+                    font-weight: bold;
+                    min-width: 60px;
+                """)
+                device_row.addWidget(device_label)
+                
+                # Device button
+                device_btn = self.light_buttons[device_id]
+                device_row.addWidget(device_btn)
+                device_row.addStretch()
+                
+                room_layout.addLayout(device_row)
+        else:
+            # Show message for rooms without devices
+            no_devices_label = QLabel("No Arduino devices in this room")
+            no_devices_label.setStyleSheet("""
+                font-size: 12px;
+                color: #888888;
+                padding: 20px 0px;
+                text-align: center;
+            """)
+            room_layout.addWidget(no_devices_label)
         
         room_layout.addStretch()
         self.tab_widget.addTab(room_tab, room_name)
@@ -772,35 +931,64 @@ class HomeViewerApp(QMainWindow):
             "Evening",    # Scene 0: All lights on
             "Night",      # Scene 1: Every other light
             "Party",      # Scene 2: Random pattern
-            "Work",       # Scene 3: First 8 lights
-            "Relax"       # Scene 4: Last 8 lights
+            "Work",       # Scene 3: L1 only
+            "Relax"       # Scene 4: L2 only
         ]
         
-        if scene_index == 0:  # Evening - All on
-            for i in range(22):
-                self.light_states[i] = True
-        elif scene_index == 1:  # Night - Every other
-            for i in range(22):
-                self.light_states[i] = (i % 2 == 0)
-        elif scene_index == 2:  # Party - Random pattern
-            import random
-            for i in range(22):
-                self.light_states[i] = random.choice([True, False])
-        elif scene_index == 3:  # Work - First 8
-            for i in range(22):
-                self.light_states[i] = (i < 8)
-        elif scene_index == 4:  # Relax - Last 8
-            for i in range(22):
-                self.light_states[i] = (i >= 9)
+        # Define scene patterns for Arduino devices
+        scene_patterns = {
+            0: {"L1": True, "L2": True},   # Evening - All on
+            1: {"L1": True, "L2": False},  # Night - L1 only
+            2: {"L1": False, "L2": True},  # Party - L2 only
+            3: {"L1": True, "L2": False},  # Work - L1 only
+            4: {"L1": False, "L2": True}   # Relax - L2 only
+        }
         
-        # Update all buttons
-        for i in range(22):
-            self.update_light_button(i)
-        
-        self.update_light_status()
-        
-        if hasattr(self, 'status_label'):
-            self.status_label.setText(f"Applied {scenes[scene_index]} scene")
+        if scene_index in scene_patterns:
+            scene_states = scene_patterns[scene_index]
+            
+            if self.arduino_tool and self.arduino_connected:
+                # Use Arduino tool to apply scene
+                asyncio.create_task(self._apply_arduino_scene(scene_states, scenes[scene_index]))
+            else:
+                # Fallback to local state change (simulation mode)
+                for device_id, state in scene_states.items():
+                    self.device_states[device_id] = state
+                    self.update_device_button(device_id)
+                
+                self.update_device_status()
+                
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText(f"Applied {scenes[scene_index]} scene (simulation mode)")
+    
+    async def _apply_arduino_scene(self, scene_states, scene_name):
+        """Apply Arduino scene asynchronously."""
+        try:
+            if self.arduino_tool and self.arduino_connected:
+                # Control each device according to scene
+                for device_id, state in scene_states.items():
+                    result = await self.arduino_tool._execute_async({
+                        "operation": "control_light",
+                        "light_id": device_id,
+                        "state": state
+                    })
+                    
+                    if result.get("success"):
+                        # Update local state based on Arduino response
+                        self.device_states[device_id] = state
+                        self.update_device_button(device_id)
+                    else:
+                        logger.error(f"Failed to apply scene to {device_id}: {result.get('error')}")
+                
+                self.update_device_status()
+                
+                # Update status
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText(f"Applied {scene_name} scene")
+        except Exception as e:
+            logger.error(f"Error applying Arduino scene: {e}")
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"Error applying scene: {str(e)}")
     
     def get_light_button_style(self, is_on):
         """Get the toggle button style for light buttons."""
@@ -1002,112 +1190,246 @@ class HomeViewerApp(QMainWindow):
         if hasattr(self, 'status_label'):
             self.status_label.setText(f"View sync: {'ON' if self.sync_views else 'OFF'}")
     
-    def toggle_light(self, light_index):
+    def toggle_light(self, device_id):
         """Toggle a specific light on/off."""
-        self.light_states[light_index] = not self.light_states[light_index]
-        self.update_light_button(light_index)
-        self.update_light_status()
-        
-        # Update status
-        if hasattr(self, 'status_label'):
-            state = "ON" if self.light_states[light_index] else "OFF"
-            # Find which room this device belongs to
-            room_name = "Unknown"
-            local_num = 1
-            for room, devices in self.room_layout.items():
-                if light_index in devices:
-                    room_name = room
-                    local_num = devices.index(light_index) + 1
-                    break
+        if self.arduino_tool and self.arduino_connected:
+            # Use Arduino tool to control the device
+            asyncio.create_task(self._toggle_arduino_device(device_id))
+        else:
+            # Fallback to local state change (simulation mode)
+            self.device_states[device_id] = not self.device_states[device_id]
+            self.update_device_button(device_id)
+            self.update_device_status()
             
-            # Determine device type and global label
-            device_type = self.device_types.get(light_index, "L")
-            if device_type == "TV":
-                global_label = f"TV{light_index-16}"
-            elif device_type == "AC":
-                global_label = f"AC{light_index-18}"
-            else:
-                global_label = f"L{light_index+1}"
+            # Update status
+            if hasattr(self, 'status_label'):
+                state = "ON" if self.device_states[device_id] else "OFF"
+                # Find which room this device belongs to
+                room_name = "Unknown"
+                for room, devices in self.room_layout.items():
+                    if device_id in devices:
+                        room_name = room
+                        break
+                
+                self.status_label.setText(f"{room_name} - {device_id} turned {state} (simulation mode)")
+    
+    async def _toggle_arduino_device(self, device_id):
+        """Toggle Arduino device asynchronously."""
+        try:
+            if self.arduino_tool and self.arduino_connected:
+                result = await self.arduino_tool._execute_async({
+                    "operation": "toggle_light",
+                    "light_id": device_id
+                })
+                
+                if result.get("success"):
+                    # Update local state based on Arduino response
+                    new_state = result.get("state") == "ON"
+                    self.device_states[device_id] = new_state
+                    self.update_device_button(device_id)
+                    self.update_device_status()
+                    
+                    # Update status
+                    if hasattr(self, 'status_label'):
+                        room_name = "Unknown"
+                        for room, devices in self.room_layout.items():
+                            if device_id in devices:
+                                room_name = room
+                                break
+                        self.status_label.setText(f"{room_name} - {device_id} turned {result.get('state')}")
+                else:
+                    # Handle error
+                    if hasattr(self, 'status_label'):
+                        self.status_label.setText(f"Failed to control {device_id}: {result.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Error toggling Arduino device {device_id}: {e}")
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"Error controlling {device_id}: {str(e)}")
+    
+    def update_device_button(self, device_id):
+        """Update the visual appearance of a device button and its label."""
+        if device_id in self.light_buttons:
+            button = self.light_buttons[device_id]
+            label = self.light_labels.get(device_id)
             
-            self.status_label.setText(f"{room_name} - {global_label} ({local_num}) turned {state}")
+            button.setText("ON" if self.device_states[device_id] else "OFF")
+            button.setChecked(self.device_states[device_id])
+            button.setStyleSheet(self.get_light_button_style(self.device_states[device_id]))
+            
+            # Update label color based on device state (if label exists)
+            if label is not None:
+                if self.device_states[device_id]:
+                    label.setStyleSheet("""
+                        font-size: 11px;
+                        color: #ffffff;
+                        font-weight: bold;
+                        min-width: 30px;
+                    """)
+                else:
+                    label.setStyleSheet("""
+                        font-size: 11px;
+                        color: #cccccc;
+                        font-weight: bold;
+                        min-width: 30px;
+                    """)
     
     def update_light_button(self, light_index):
-        """Update the visual appearance of a light button and its label."""
-        button = self.light_buttons[light_index]
-        label = self.light_labels[light_index]
-        
-        button.setText("ON" if self.light_states[light_index] else "OFF")
-        button.setChecked(self.light_states[light_index])
-        button.setStyleSheet(self.get_light_button_style(self.light_states[light_index]))
-        
-        # Update label color based on light state (if label exists)
-        if label is not None:
-            if self.light_states[light_index]:
-                label.setStyleSheet("""
-                    font-size: 11px;
-                    color: #ffffff;
-                    font-weight: bold;
-                    min-width: 30px;
-                """)
-            else:
-                label.setStyleSheet("""
-                    font-size: 11px;
-                    color: #cccccc;
-                    font-weight: bold;
-                    min-width: 30px;
-                """)
+        """Legacy method for compatibility - redirects to update_device_button."""
+        # Convert old index-based system to new device_id system
+        if isinstance(light_index, int):
+            # This is the old system - convert to device_id
+            device_id = f"L{light_index + 1}"
+            if device_id in self.device_states:
+                self.update_device_button(device_id)
+        else:
+            # This is already a device_id
+            self.update_device_button(light_index)
     
-    def update_light_status(self):
+    def update_device_status(self):
         """Update the device status counter."""
-        on_count = sum(self.light_states)
+        on_count = sum(1 for state in self.device_states.values() if state)
         
         if hasattr(self, 'light_status'):
-            self.light_status.setText(f"{on_count}/22 ON")
+            self.light_status.setText(f"{on_count}/2 ON")
         
         if hasattr(self, 'device_count_label'):
-            self.device_count_label.setText(f"{on_count}/22 devices ON")
+            self.device_count_label.setText(f"{on_count}/2 devices ON")
+    
+    def update_light_status(self):
+        """Legacy method for compatibility - redirects to update_device_status."""
+        self.update_device_status()
     
     def all_lights_on(self):
         """Turn all devices on."""
-        for i in range(22):
-            self.light_states[i] = True
-            self.update_light_button(i)
-        
-        self.update_light_status()
-        if hasattr(self, 'status_label'):
-            self.status_label.setText("All devices turned ON")
+        if self.arduino_tool and self.arduino_connected:
+            # Use Arduino tool to control all devices
+            asyncio.create_task(self._control_all_arduino_devices(True))
+        else:
+            # Fallback to local state change (simulation mode)
+            for device_id in self.device_states:
+                self.device_states[device_id] = True
+                self.update_device_button(device_id)
+            
+            self.update_device_status()
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("All devices turned ON (simulation mode)")
     
     def all_lights_off(self):
         """Turn all devices off."""
-        for i in range(22):
-            self.light_states[i] = False
-            self.update_light_button(i)
-        
-        self.update_light_status()
-        if hasattr(self, 'status_label'):
-            self.status_label.setText("All devices turned OFF")
+        if self.arduino_tool and self.arduino_connected:
+            # Use Arduino tool to control all devices
+            asyncio.create_task(self._control_all_arduino_devices(False))
+        else:
+            # Fallback to local state change (simulation mode)
+            for device_id in self.device_states:
+                self.device_states[device_id] = False
+                self.update_device_button(device_id)
+            
+            self.update_device_status()
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("All devices turned OFF (simulation mode)")
+    
+    async def _control_all_arduino_devices(self, state):
+        """Control all Arduino devices asynchronously."""
+        try:
+            if self.arduino_tool and self.arduino_connected:
+                result = await self.arduino_tool._execute_async({
+                    "operation": "control_all_lights",
+                    "state": state
+                })
+                
+                if result.get("success"):
+                    # Update local states based on Arduino response
+                    for device_id in self.device_states:
+                        self.device_states[device_id] = state
+                        self.update_device_button(device_id)
+                    
+                    self.update_device_status()
+                    
+                    # Update status
+                    if hasattr(self, 'status_label'):
+                        state_text = "ON" if state else "OFF"
+                        self.status_label.setText(f"All devices turned {state_text}")
+                else:
+                    # Handle error
+                    if hasattr(self, 'status_label'):
+                        self.status_label.setText(f"Failed to control all devices: {result.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Error controlling all Arduino devices: {e}")
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"Error controlling all devices: {str(e)}")
     
     def room_lights_on(self, room_name):
         """Turn on all devices in a specific room."""
         if room_name in self.room_layout:
-            for device_idx in self.room_layout[room_name]:
-                self.light_states[device_idx] = True
-                self.update_light_button(device_idx)
-            
-            self.update_light_status()
-            if hasattr(self, 'status_label'):
-                self.status_label.setText(f"All devices in {room_name} turned ON")
+            device_ids = self.room_layout[room_name]
+            if device_ids:
+                if self.arduino_tool and self.arduino_connected:
+                    # Use Arduino tool to control room devices
+                    asyncio.create_task(self._control_room_arduino_devices(room_name, device_ids, True))
+                else:
+                    # Fallback to local state change (simulation mode)
+                    for device_id in device_ids:
+                        self.device_states[device_id] = True
+                        self.update_device_button(device_id)
+                    
+                    self.update_device_status()
+                    if hasattr(self, 'status_label'):
+                        self.status_label.setText(f"All devices in {room_name} turned ON (simulation mode)")
+            else:
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText(f"No Arduino devices in {room_name}")
     
     def room_lights_off(self, room_name):
         """Turn off all devices in a specific room."""
         if room_name in self.room_layout:
-            for device_idx in self.room_layout[room_name]:
-                self.light_states[device_idx] = False
-                self.update_light_button(device_idx)
-            
-            self.update_light_status()
+            device_ids = self.room_layout[room_name]
+            if device_ids:
+                if self.arduino_tool and self.arduino_connected:
+                    # Use Arduino tool to control room devices
+                    asyncio.create_task(self._control_room_arduino_devices(room_name, device_ids, False))
+                else:
+                    # Fallback to local state change (simulation mode)
+                    for device_id in device_ids:
+                        self.device_states[device_id] = False
+                        self.update_device_button(device_id)
+                    
+                    self.update_device_status()
+                    if hasattr(self, 'status_label'):
+                        self.status_label.setText(f"All devices in {room_name} turned OFF (simulation mode)")
+            else:
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText(f"No Arduino devices in {room_name}")
+    
+    async def _control_room_arduino_devices(self, room_name, device_ids, state):
+        """Control room Arduino devices asynchronously."""
+        try:
+            if self.arduino_tool and self.arduino_connected:
+                # Control each device in the room
+                for device_id in device_ids:
+                    result = await self.arduino_tool._execute_async({
+                        "operation": "control_light",
+                        "light_id": device_id,
+                        "state": state
+                    })
+                    
+                    if result.get("success"):
+                        # Update local state based on Arduino response
+                        self.device_states[device_id] = state
+                        self.update_device_button(device_id)
+                    else:
+                        logger.error(f"Failed to control {device_id}: {result.get('error')}")
+                
+                self.update_device_status()
+                
+                # Update status
+                if hasattr(self, 'status_label'):
+                    state_text = "ON" if state else "OFF"
+                    self.status_label.setText(f"All devices in {room_name} turned {state_text}")
+        except Exception as e:
+            logger.error(f"Error controlling room Arduino devices: {e}")
             if hasattr(self, 'status_label'):
-                self.status_label.setText(f"All devices in {room_name} turned OFF")
+                self.status_label.setText(f"Error controlling devices in {room_name}: {str(e)}")
     
     def toggle_scene(self):
         """Toggle between different light scenes."""
@@ -1151,6 +1473,14 @@ class HomeViewerApp(QMainWindow):
     
     def closeEvent(self, event):
         """Handle application close."""
+        # Clean up Arduino thread (only if we created our own)
+        if hasattr(self, 'arduino_thread') and self.arduino_thread:
+            self.arduino_thread.stop()
+        
+        # Stop connection monitoring timer
+        if hasattr(self, 'connection_timer'):
+            self.connection_timer.stop()
+        
         # Clean up resources
         if hasattr(self.viewer_3d, 'timer'):
             self.viewer_3d.timer.stop()

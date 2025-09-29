@@ -663,9 +663,20 @@ class HeadlessAgentWindow(QWidget):
             from .home_viewer_app import HomeViewerApp
             print("✓ Home viewer app imported successfully")
             
+            # Get the Arduino tool instance from the tool registry
+            arduino_tool = None
+            if hasattr(self, 'tool_registry') and self.tool_registry:
+                arduino_tool = self.tool_registry.get_tool('arduino_bluetooth_control')
+                if arduino_tool:
+                    print("✓ Arduino tool instance found and will be shared")
+                else:
+                    print("⚠ Arduino tool not found in tool registry - will run in simulation mode")
+            else:
+                print("⚠ No tool registry available - will run in simulation mode")
+            
             # Create and show the home viewer window
             print("Creating home viewer window...")
-            self.home_viewer_window = HomeViewerApp()
+            self.home_viewer_window = HomeViewerApp(arduino_tool=arduino_tool)
             print("✓ Home viewer window created")
             
             print("Showing home viewer window...")
