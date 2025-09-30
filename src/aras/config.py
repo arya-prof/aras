@@ -4,7 +4,7 @@ Configuration management for Aras Agent.
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 try:
     from pydantic_settings import BaseSettings
@@ -86,6 +86,11 @@ class Settings(BaseSettings):
     default_voice: str = Field(default="Zira", env="DEFAULT_VOICE")
     voice_rate: int = Field(default=0, env="VOICE_RATE")  # -10 to 10, 0 is normal
     voice_volume: int = Field(default=100, env="VOICE_VOLUME")  # 0 to 100
+    
+    # Multi-language voice support
+    voice_language: str = Field(default="auto", env="VOICE_LANGUAGE")  # 'en-US', 'fa-IR', or 'auto'
+    supported_languages: List[str] = Field(default=["en-US", "fa-IR"])
+    enable_auto_language_detection: bool = Field(default=True, env="ENABLE_AUTO_LANGUAGE_DETECTION")
     
     class Config:
         env_file = ".env"

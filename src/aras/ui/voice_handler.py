@@ -450,13 +450,170 @@ class VoiceCommandHandler(QObject):
             r"controller.*command"
         ]
         
+        # Persian home status patterns
+        self.home_status_patterns_fa = [
+            r"وضعیت.*خانه",
+            r"نمایش.*وضعیت.*خانه",
+            r"خانه.*چطوره",
+            r"خانه.*چطور.*است",
+            r"چه.*خبر.*خانه",
+            r"دستگاه.*ها.*خانه",
+            r"خانه.*هوشمند",
+            r"وضعیت.*چراغ",
+            r"وضعیت.*در",
+            r"دما.*چقدر",
+            r"وضعیت.*دما",
+            r"نمایش.*خانه",
+            r"باز.*کن.*خانه",
+            r"کنترل.*خانه",
+            r"داشبورد.*خانه",
+            r"پنل.*خانه",
+            r"مانیتور.*خانه",
+            r"تصویر.*خانه",
+            r"خانه.*سه.*بعدی",
+            r"خانه.*دو.*بعدی",
+        ]
+
+        # Persian Arduino control patterns
+        self.arduino_patterns_fa = [
+            # Light control - چراغ 1 (with both English and Persian numerals)
+            r"روشن.*کن.*چراغ.*یک",
+            r"چراغ.*یک.*روشن",
+            r"چراغ.*اول.*روشن",
+            r"روشن.*کن.*چراغ.*1",
+            r"چراغ.*1.*روشن",
+            r"روشن.*کن.*چراغ.*۱",
+            r"چراغ.*۱.*روشن",
+            r"خاموش.*کن.*چراغ.*یک",
+            r"چراغ.*یک.*خاموش",
+            r"چراغ.*اول.*خاموش",
+            r"خاموش.*کن.*چراغ.*1",
+            r"چراغ.*1.*خاموش",
+            r"خاموش.*کن.*چراغ.*۱",
+            r"چراغ.*۱.*خاموش",
+            r"سوئیچ.*چراغ.*یک",
+            r"تغییر.*چراغ.*یک",
+            r"سوئیچ.*چراغ.*1",
+            r"تغییر.*چراغ.*1",
+            r"سوئیچ.*چراغ.*۱",
+            r"تغییر.*چراغ.*۱",
+            
+            # Light control - چراغ 2 (with both English and Persian numerals)
+            r"روشن.*کن.*چراغ.*دو",
+            r"چراغ.*دو.*روشن",
+            r"چراغ.*دوم.*روشن",
+            r"روشن.*کن.*چراغ.*2",
+            r"چراغ.*2.*روشن",
+            r"روشن.*کن.*چراغ.*۲",
+            r"چراغ.*۲.*روشن",
+            r"خاموش.*کن.*چراغ.*دو",
+            r"چراغ.*دو.*خاموش",
+            r"چراغ.*دوم.*خاموش",
+            r"خاموش.*کن.*چراغ.*2",
+            r"چراغ.*2.*خاموش",
+            r"خاموش.*کن.*چراغ.*۲",
+            r"چراغ.*۲.*خاموش",
+            r"سوئیچ.*چراغ.*دو",
+            r"تغییر.*چراغ.*دو",
+            r"سوئیچ.*چراغ.*2",
+            r"تغییر.*چراغ.*2",
+            r"سوئیچ.*چراغ.*۲",
+            r"تغییر.*چراغ.*۲",
+            
+            # All lights
+            r"روشن.*کن.*همه.*چراغ",
+            r"همه.*چراغ.*روشن",
+            r"چراغ.*ها.*روشن",
+            r"خاموش.*کن.*همه.*چراغ",
+            r"همه.*چراغ.*خاموش",
+            r"چراغ.*ها.*خاموش",
+            r"سوئیچ.*همه.*چراغ",
+            r"تغییر.*همه.*چراغ",
+            
+            # Arduino status
+            r"وضعیت.*آردوینو",
+            r"آردوینو.*چطوره",
+            r"وضعیت.*بلوتوث",
+            r"دستگاه.*آردوینو",
+            r"کنترلر.*وضعیت",
+        ]
+
+        # Chatbox patterns in Persian
+        self.chatbox_patterns_fa = [
+            r"باز.*کن.*چت",
+            r"نمایش.*چت",
+            r"چت.*باکس",
+            r"گفتگو",
+            r"صحبت.*کن",
+            r"چت.*کن",
+            r"پیام.*بده",
+            r"سوال.*بپرس",
+        ]
+
+        # File operation patterns in Persian
+        self.file_operation_patterns_fa = [
+            r"ایجاد.*فایل.*(.+)",
+            r"بساز.*فایل.*(.+)",
+            r"فایل.*جدید.*(.+)",
+            r"حذف.*فایل.*(.+)",
+            r"پاک.*کن.*فایل.*(.+)",
+            r"ساخت.*فایل.*(.+)",
+            r"نوشتن.*فایل.*(.+)",
+        ]
+
+        # Language switching patterns in English
+        self.language_switch_patterns = [
+            r"switch.*to.*persian",
+            r"change.*language.*persian",
+            r"persian.*mode",
+            r"speak.*persian",
+            r"switch.*to.*english",
+            r"change.*language.*english",
+            r"english.*mode",
+            r"speak.*english",
+        ]
+
+        # Language switching patterns in Persian
+        self.language_switch_patterns_fa = [
+            r"تغییر.*زبان.*فارسی",
+            r"فارسی.*شو",
+            r"زبان.*فارسی",
+            r"فارسی.*کن",
+            r"حالا.*فارسی",
+            r"فارسی.*حالا",
+            r"انگلیسی.*شو",
+            r"تغییر.*زبان.*انگلیسی",
+            r"انگلیسی.*کن",
+            r"زبان.*انگلیسی",
+            r"switch.*to.*english",
+            r"change.*language.*english",
+            r"english.*mode",
+            r"speak.*english",
+        ]
+
+        # Multi-language support
+        self.supported_languages = ['en-US', 'fa-IR']
+        self.current_language = 'en-US'
+        self.enable_auto_language_detection = True
+
         # Compile patterns for efficiency
         self.compiled_home_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns]
+        self.compiled_home_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns_fa]
+        
         self.compiled_file_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns]
+        self.compiled_file_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns_fa]
+        
         self.compiled_chatbox_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_patterns]
+        self.compiled_chatbox_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_patterns_fa]
+        
         self.compiled_chatbox_hide_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_hide_patterns]
         self.compiled_chatbox_close_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_close_patterns]
+        
         self.compiled_arduino_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.arduino_patterns]
+        self.compiled_arduino_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.arduino_patterns_fa]
+        
+        self.compiled_language_switch_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.language_switch_patterns]
+        self.compiled_language_switch_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.language_switch_patterns_fa]
     
     def set_home_status_callback(self, callback: Callable):
         """Set the callback function for home status requests."""
@@ -478,8 +635,8 @@ class VoiceCommandHandler(QObject):
         """Set the callback function for Arduino control requests."""
         self.arduino_control_callback = callback
     
-    def process_voice_command(self, text: str) -> bool:
-        """Optimized voice command processing for real-time performance."""
+    def process_voice_command(self, text: str, language: str = 'en-US') -> bool:
+        """Optimized voice command processing for real-time performance with multi-language support."""
         import time
         
         text = text.strip()
@@ -497,28 +654,61 @@ class VoiceCommandHandler(QObject):
         
         text_lower = text.lower()
         
+        # Use the passed language parameter instead of automatic detection
+        is_persian = language == 'fa-IR'
+        
+        # Select appropriate pattern sets
+        if is_persian:
+            home_patterns = self.compiled_home_patterns_fa
+            arduino_patterns = self.compiled_arduino_patterns_fa
+            file_patterns = self.compiled_file_patterns_fa
+            chatbox_patterns = self.compiled_chatbox_patterns_fa
+            chatbox_hide_patterns = self.compiled_chatbox_hide_patterns  # Keep English for now
+            chatbox_close_patterns = self.compiled_chatbox_close_patterns  # Keep English for now
+            language_switch_patterns = self.compiled_language_switch_patterns_fa
+            print("[CMD] Processing Persian command")
+        else:
+            home_patterns = self.compiled_home_patterns
+            arduino_patterns = self.compiled_arduino_patterns
+            file_patterns = self.compiled_file_patterns
+            chatbox_patterns = self.compiled_chatbox_patterns
+            chatbox_hide_patterns = self.compiled_chatbox_hide_patterns
+            chatbox_close_patterns = self.compiled_chatbox_close_patterns
+            language_switch_patterns = self.compiled_language_switch_patterns
+            print(f"[CMD] Processing English command: {text}")
+        
         # Fast pattern matching first (no debug overhead)
-        for pattern in self.compiled_chatbox_hide_patterns:
+        for pattern in chatbox_hide_patterns:
             if pattern.search(text_lower):
                 self.trigger_chatbox_hide()
                 return True
         
-        for pattern in self.compiled_chatbox_close_patterns:
+        for pattern in chatbox_close_patterns:
             if pattern.search(text_lower):
                 self.trigger_chatbox_close()
                 return True
         
-        for pattern in self.compiled_chatbox_patterns:
+        for pattern in chatbox_patterns:
             if pattern.search(text_lower):
                 self.trigger_chatbox()
                 return True
         
+        # Check language switching patterns
+        for i, pattern in enumerate(language_switch_patterns):
+            if pattern.search(text_lower):
+                command_id = int(time.time() * 1000)
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Language switch pattern {i+1}")
+                print(f"[DEBUG-{command_id}] TRIGGER_LANGUAGE_SWITCH: Triggering language switch")
+                self.trigger_language_switch(text, is_persian)
+                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Language switch successful")
+                return True
+        
         # Check Arduino control patterns FIRST (before LLM)
-        for i, pattern in enumerate(self.compiled_arduino_patterns):
+        for i, pattern in enumerate(arduino_patterns):
             match = pattern.search(text_lower)
             if match:
                 command_id = int(time.time() * 1000)
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Arduino pattern {i+1}: {self.arduino_patterns[i]}")
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Arduino pattern {i+1}")
                 print(f"[DEBUG-{command_id}] TRIGGER_ARDUINO_CONTROL: Triggering Arduino control")
                 self.trigger_arduino_control(text, match)
                 print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
@@ -537,37 +727,40 @@ class VoiceCommandHandler(QObject):
         # Fallback to pattern matching
         
         # Check home status patterns
-        for i, pattern in enumerate(self.compiled_home_patterns):
+        for i, pattern in enumerate(home_patterns):
             if pattern.search(text_lower):
                 command_id = int(time.time() * 1000)
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Home pattern {i+1}: {self.home_status_patterns[i]}")
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Home pattern {i+1}")
                 print(f"[DEBUG-{command_id}] TRIGGER_HOME_STATUS: Triggering home status")
                 self.trigger_home_status()
                 print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
         
         # Check file operation patterns
-        for i, pattern in enumerate(self.compiled_file_patterns):
+        for i, pattern in enumerate(file_patterns):
             match = pattern.search(text_lower)
             if match:
                 command_id = int(time.time() * 1000)
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: File pattern {i+1}: {self.file_operation_patterns[i]}")
+                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: File pattern {i+1}")
                 print(f"[DEBUG-{command_id}] TRIGGER_FILE_OPERATION: Triggering file operation")
                 self.trigger_file_operation(text, match)
                 print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
                 return True
-        
-        
         
         command_id = int(time.time() * 1000)
         print(f"[DEBUG-{command_id}] NO_MATCH: No patterns matched for: '{text}'")
         print(f"[DEBUG-{command_id}] PROCESSING_FAILED: Command not recognized")
         return False
     
+    def _contains_persian(self, text: str) -> bool:
+        """Check if text contains Persian characters."""
+        persian_pattern = re.compile(r'[\u0600-\u06FF]')
+        return bool(persian_pattern.search(text))
+    
     def _process_with_llm(self, command: str) -> Dict[str, Any]:
         """Process command using LLM for natural language understanding."""
         try:
-            print(f"[DEBUG-LLM] Starting LLM processing for: '{command}'")
+            print("[DEBUG-LLM] Starting LLM processing")
             print(f"[DEBUG-LLM] LLM client type: {type(self.llm_client)}")
             print(f"[DEBUG-LLM] LLM client available: {self.llm_client is not None}")
             
@@ -1142,6 +1335,56 @@ class VoiceCommandHandler(QObject):
         print("Signal emitted for chatbox close")
         print("=== CHATBOX CLOSE TRIGGER COMPLETE ===")
     
+    def trigger_language_switch(self, text: str, is_persian: bool):
+        """Trigger language switching between English and Persian."""
+        print("=== LANGUAGE SWITCH TRIGGER ===")
+        print(f"Triggering language switch for: '{text}' (currently Persian: {is_persian})")
+        
+        # Determine target language based on command content
+        text_lower = text.lower()
+        
+        # Check for English switch commands
+        if any(word in text_lower for word in ['انگلیسی', 'english', 'switch to english', 'change to english']):
+            new_language = 'en-US'
+            response = "Switching to English mode. You can now speak in English."
+            print("Switching to English mode")
+        # Check for Persian switch commands
+        elif any(word in text_lower for word in ['فارسی', 'persian', 'switch to persian', 'change to persian']):
+            new_language = 'fa-IR'
+            response = "حالا به فارسی صحبت می‌کنم. می‌توانید به فارسی صحبت کنید."
+            print("Switching to Persian mode")
+        else:
+            # Default behavior based on current language
+            if is_persian:
+                new_language = 'en-US'
+                response = "Switching to English mode. You can now speak in English."
+                print("Switching to English mode")
+            else:
+                new_language = 'fa-IR'
+                response = "حالا به فارسی صحبت می‌کنم. می‌توانید به فارسی صحبت کنید."
+                print("Switching to Persian mode")
+        
+        # Update current language persistently
+        self.current_language = new_language
+        
+        # Emit command processed signal with language switch info
+        result = {
+            'success': True,
+            'response': response,
+            'action_result': {
+                'action_taken': True,
+                'actions': [{'type': 'language_switch', 'description': f'Switched to {new_language}'}],
+                'execution_results': []
+            },
+            'command': text,
+            'language_switched': True,
+            'new_language': new_language
+        }
+        
+        self.command_processed.emit(text, result)
+        print(f"Language switched to: {new_language}")
+        print("=== LANGUAGE SWITCH TRIGGER COMPLETE ===")
+    
     def trigger_file_operation(self, text: str, match):
         """Trigger a file operation based on voice command."""
         print(f"Triggering file operation for: '{text}'")
@@ -1249,84 +1492,156 @@ class VoiceCommandHandler(QObject):
             self.speak_response(response_manager.get_error_response('file_operation_unknown'))
     
     def trigger_arduino_control(self, text: str, match):
-        """Trigger Arduino control based on voice command."""
-        print(f"Triggering Arduino control for: '{text}'")
+        """Trigger Arduino control based on voice command with multi-language support."""
+        print("Triggering Arduino control for Persian command")
         
         text_lower = text.lower()
         operation = None
         parameters = {}
         
-        # Light 1 control
-        if any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
-            operation = "control_light"
-            parameters = {
-                "operation": "control_light",
-                "light_id": "L1",
-                "state": True
-            }
-        elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
-            operation = "control_light"
-            parameters = {
-                "operation": "control_light",
-                "light_id": "L1",
-                "state": False
-            }
-        elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['toggle', 'switch']):
-            operation = "toggle_light"
-            parameters = {
-                "operation": "toggle_light",
-                "light_id": "L1"
-            }
+        # Check if it's a Persian command
+        is_persian = self._contains_persian(text)
         
-        # Light 2 control
-        elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
-            operation = "control_light"
-            parameters = {
-                "operation": "control_light",
-                "light_id": "L2",
-                "state": True
-            }
-        elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
-            operation = "control_light"
-            parameters = {
-                "operation": "control_light",
-                "light_id": "L2",
-                "state": False
-            }
-        elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['toggle', 'switch']):
-            operation = "toggle_light"
-            parameters = {
-                "operation": "toggle_light",
-                "light_id": "L2"
-            }
+        if is_persian:
+            # Persian command processing
+            # Light 1 control (چراغ یک)
+            if any(word in text_lower for word in ['چراغ یک', 'چراغ اول', 'چراغ 1', 'چراغ ۱']) and any(word in text_lower for word in ['روشن', 'روشن کن']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L1",
+                    "state": True
+                }
+            elif any(word in text_lower for word in ['چراغ یک', 'چراغ اول', 'چراغ 1', 'چراغ ۱']) and any(word in text_lower for word in ['خاموش', 'خاموش کن']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L1",
+                    "state": False
+                }
+            elif any(word in text_lower for word in ['چراغ یک', 'چراغ اول', 'چراغ 1', 'چراغ ۱']) and any(word in text_lower for word in ['تغییر', 'سوئیچ']):
+                operation = "toggle_light"
+                parameters = {
+                    "operation": "toggle_light",
+                    "light_id": "L1"
+                }
+            
+            # Light 2 control (چراغ دو)
+            elif any(word in text_lower for word in ['چراغ دو', 'چراغ دوم', 'چراغ 2', 'چراغ ۲']) and any(word in text_lower for word in ['روشن', 'روشن کن']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L2",
+                    "state": True
+                }
+            elif any(word in text_lower for word in ['چراغ دو', 'چراغ دوم', 'چراغ 2', 'چراغ ۲']) and any(word in text_lower for word in ['خاموش', 'خاموش کن']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L2",
+                    "state": False
+                }
+            elif any(word in text_lower for word in ['چراغ دو', 'چراغ دوم', 'چراغ 2', 'چراغ ۲']) and any(word in text_lower for word in ['تغییر', 'سوئیچ']):
+                operation = "toggle_light"
+                parameters = {
+                    "operation": "toggle_light",
+                    "light_id": "L2"
+                }
+            
+            # All lights control (همه چراغ)
+            elif any(word in text_lower for word in ['همه چراغ', 'چراغ ها', 'همه چراغ ها']) and any(word in text_lower for word in ['روشن', 'روشن کن']):
+                operation = "control_all_lights"
+                parameters = {
+                    "operation": "control_all_lights",
+                    "state": True
+                }
+            elif any(word in text_lower for word in ['همه چراغ', 'چراغ ها', 'همه چراغ ها']) and any(word in text_lower for word in ['خاموش', 'خاموش کن']):
+                operation = "control_all_lights"
+                parameters = {
+                    "operation": "control_all_lights",
+                    "state": False
+                }
+            
+            # Arduino status
+            elif any(word in text_lower for word in ['وضعیت آردوینو', 'آردوینو چطوره', 'وضعیت بلوتوث', 'دستگاه آردوینو', 'کنترلر وضعیت']):
+                operation = "arduino_status"
+                parameters = {
+                    "operation": "arduino_status"
+                }
         
-        # All lights control
-        elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
-            operation = "control_all_lights"
-            parameters = {
-                "operation": "control_all_lights",
-                "state": True
-            }
-        elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
-            operation = "control_all_lights"
-            parameters = {
-                "operation": "control_all_lights",
-                "state": False
-            }
-        
-        # Arduino status
-        elif any(word in text_lower for word in ['arduino', 'bluetooth', 'device', 'controller']) and any(word in text_lower for word in ['status', 'state', 'info', 'ping']):
-            operation = "get_status"
-            parameters = {
-                "operation": "get_status"
-            }
-        
-        # Ping
-        elif any(word in text_lower for word in ['ping', 'test']):
-            operation = "ping"
-            parameters = {
-                "operation": "ping"
-            }
+        else:
+            # English command processing
+            # Light 1 control
+            if any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L1",
+                    "state": True
+                }
+            elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L1",
+                    "state": False
+                }
+            elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['toggle', 'switch']):
+                operation = "toggle_light"
+                parameters = {
+                    "operation": "toggle_light",
+                    "light_id": "L1"
+                }
+            
+            # Light 2 control
+            elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L2",
+                    "state": True
+                }
+            elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
+                operation = "control_light"
+                parameters = {
+                    "operation": "control_light",
+                    "light_id": "L2",
+                    "state": False
+                }
+            elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['toggle', 'switch']):
+                operation = "toggle_light"
+                parameters = {
+                    "operation": "toggle_light",
+                    "light_id": "L2"
+                }
+            
+            # All lights control
+            elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
+                operation = "control_all_lights"
+                parameters = {
+                    "operation": "control_all_lights",
+                    "state": True
+                }
+            elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
+                operation = "control_all_lights"
+                parameters = {
+                    "operation": "control_all_lights",
+                    "state": False
+                }
+            
+            # Arduino status
+            elif any(word in text_lower for word in ['arduino', 'bluetooth', 'device', 'controller']) and any(word in text_lower for word in ['status', 'state', 'info', 'ping']):
+                operation = "get_status"
+                parameters = {
+                    "operation": "get_status"
+                }
+            
+            # Ping
+            elif any(word in text_lower for word in ['ping', 'test']):
+                operation = "ping"
+                parameters = {
+                    "operation": "ping"
+                }
         
         if operation:
             print(f"Arduino operation: {operation} with parameters: {parameters}")
@@ -1568,18 +1883,26 @@ class VoiceCommandProcessor:
                     # Listen with minimal timeout for real-time performance
                     audio = self.recognizer.listen(source, timeout=0.1, phrase_time_limit=10)
                 
-                # Process speech recognition immediately
+                # Process speech recognition with current language setting
                 try:
-                    # Use Google recognition with optimized settings
-                    text = self.recognizer.recognize_google(audio, language="en-US")
+                    # Use current language setting instead of automatic detection
+                    text = None
+                    current_language = self.handler.current_language
+                    
+                    try:
+                        text = self.recognizer.recognize_google(audio, language=current_language)
+                        if text and text.strip():
+                            print(f"[MIC] Voice (language={current_language}): '{text}'")
+                    except sr.UnknownValueError:
+                        pass  # Speech was unintelligible - this is normal
+                    except sr.RequestError as e:
+                        print(f"[ERROR] Recognition error for {current_language}: {e}")
+                        continue
                     
                     if text and text.strip():
-                        # Process immediately without blocking
-                        print(f"[MIC] Voice: '{text}'")
-                        
                         # Process in a separate thread to avoid blocking
                         def process_async():
-                            if self.handler.process_voice_command(text):
+                            if self.handler.process_voice_command(text, current_language):
                                 print("[SUCCESS] Voice command processed successfully!")
                             else:
                                 print(f"[ERROR] Command not recognized: '{text}'")
