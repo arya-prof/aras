@@ -118,8 +118,8 @@ class HomeViewerApp(QMainWindow):
         self.sync_views = True
         self.current_room = None
         
-        # Device states - Updated to match Arduino tool (L1, L2)
-        self.device_states = {"L1": False, "L2": False}  # Real Arduino devices
+        # Device states - Updated to match Arduino tool (L1, L2, RING)
+        self.device_states = {"L1": False, "L2": False, "RING": False}  # Real Arduino devices
         self.light_states = self.device_states  # Keep compatibility with existing code
         
         # Camera states
@@ -267,23 +267,24 @@ class HomeViewerApp(QMainWindow):
         """Initialize device controls and room layout."""
         # Define room layout with device assignments - Updated for Arduino devices
         self.room_layout = {
-            "Bedroom 1": ["L1"],         # L1 (Arduino controlled)
-            "Living Room": ["L2"],       # L2 (Arduino controlled)
-            "Kitchen": [],               # No Arduino devices
-            "Bathroom": [],              # No Arduino devices
-            "Outside": []                # No Arduino devices
+            "Bedroom 1": ["L1", "L2", "RING"],   # L1, L2, and RING (Arduino controlled)
+            "Living Room": [],                   # No Arduino devices
+            "Kitchen": [],                       # No Arduino devices
+            "Bathroom": [],                      # No Arduino devices
+            "Outside": []                        # No Arduino devices
         }
         
         # Device type mapping - Only Arduino devices
         self.device_types = {
             "L1": "Light",   # L1 in Bedroom 1
-            "L2": "Light"    # L2 in Living Room
+            "L2": "Light",   # L2 in Bedroom 1
+            "RING": "Ring Light"  # RING in Bedroom 1
         }
         
         # Create device controls for Arduino devices only
         self.light_buttons = {}
         self.light_labels = {}
-        for device_id in ["L1", "L2"]:
+        for device_id in ["L1", "L2", "RING"]:
             # Create button
             btn = QPushButton()
             btn.setMinimumSize(60, 25)
@@ -380,11 +381,11 @@ class HomeViewerApp(QMainWindow):
         
         # Create room-based tabs - Updated for Arduino devices
         self.create_overview_tab()
-        self.create_room_tab("Bedroom 1", ["L1"])         # L1 (Arduino controlled)
-        self.create_room_tab("Living Room", ["L2"])       # L2 (Arduino controlled)
-        self.create_room_tab("Kitchen", [])               # No Arduino devices
-        self.create_room_tab("Bathroom", [])              # No Arduino devices
-        self.create_room_tab("Outside", [])               # No Arduino devices
+        self.create_room_tab("Bedroom 1", ["L1", "L2", "RING"])   # L1, L2, and RING (Arduino controlled)
+        self.create_room_tab("Living Room", [])                   # No Arduino devices
+        self.create_room_tab("Kitchen", [])                       # No Arduino devices
+        self.create_room_tab("Bathroom", [])                      # No Arduino devices
+        self.create_room_tab("Outside", [])                       # No Arduino devices
         self.create_security_cameras_tab()
         
         parent_layout.addWidget(self.tab_widget)
@@ -429,7 +430,7 @@ class HomeViewerApp(QMainWindow):
         global_controls_layout.addWidget(all_off_btn)
         
         # Device status
-        self.device_count_label = QLabel("0/2 devices ON")
+        self.device_count_label = QLabel("0/3 devices ON")
         self.device_count_label.setStyleSheet("""
             font-size: 14px;
             color: #cccccc;
@@ -929,19 +930,19 @@ class HomeViewerApp(QMainWindow):
         
         scenes = [
             "Evening",    # Scene 0: All lights on
-            "Night",      # Scene 1: Every other light
-            "Party",      # Scene 2: Random pattern
-            "Work",       # Scene 3: L1 only
+            "Night",      # Scene 1: L1 only
+            "Party",      # Scene 2: L2 and RING
+            "Work",       # Scene 3: L1 and RING
             "Relax"       # Scene 4: L2 only
         ]
         
         # Define scene patterns for Arduino devices
         scene_patterns = {
-            0: {"L1": True, "L2": True},   # Evening - All on
-            1: {"L1": True, "L2": False},  # Night - L1 only
-            2: {"L1": False, "L2": True},  # Party - L2 only
-            3: {"L1": True, "L2": False},  # Work - L1 only
-            4: {"L1": False, "L2": True}   # Relax - L2 only
+            0: {"L1": True, "L2": True, "RING": True},   # Evening - All on
+            1: {"L1": True, "L2": False, "RING": False}, # Night - L1 only
+            2: {"L1": False, "L2": True, "RING": True},  # Party - L2 and RING
+            3: {"L1": True, "L2": False, "RING": True},  # Work - L1 and RING
+            4: {"L1": False, "L2": True, "RING": False}  # Relax - L2 only
         }
         
         if scene_index in scene_patterns:
@@ -1293,7 +1294,7 @@ class HomeViewerApp(QMainWindow):
             self.light_status.setText(f"{on_count}/2 ON")
         
         if hasattr(self, 'device_count_label'):
-            self.device_count_label.setText(f"{on_count}/2 devices ON")
+            self.device_count_label.setText(f"{on_count}/3 devices ON")
     
     def update_light_status(self):
         """Legacy method for compatibility - redirects to update_device_status."""
