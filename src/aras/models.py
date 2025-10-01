@@ -28,6 +28,7 @@ class ToolCategory(str, Enum):
     KNOWLEDGE = "knowledge"
     VOICE_VISION = "voice_vision"
     SAFETY = "safety"
+    MUSIC = "music"
 
 
 class Message(BaseModel):

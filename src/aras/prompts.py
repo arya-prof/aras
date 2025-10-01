@@ -19,7 +19,8 @@ class SystemPromptManager:
             "Voice and image processing",
             "Security and access control",
             "Camera control and recording",
-            "Raspberry Pi control and GPIO operations"
+            "Raspberry Pi control and GPIO operations",
+            "Spotify music control and playlist management"
         ]
         
         self.base_response_guidelines = [
@@ -72,6 +73,18 @@ For Telegram operations, you can:
 - Search messages: telegram_manager with operation "search_messages"
 - Create groups: telegram_manager with operation "create_group"
 - And many more Telegram operations
+
+For SPOTIFY MUSIC CONTROL, use spotify_control:
+- Play music: spotify_control with {{"action": "play"}}
+- Pause music: spotify_control with {{"action": "pause"}}
+- Skip to next song: spotify_control with {{"action": "skip_next"}}
+- Skip to previous song: spotify_control with {{"action": "skip_previous"}}
+- Set volume: spotify_control with {{"action": "set_volume", "volume": 75}}
+- What's playing: spotify_control with {{"action": "get_current_track"}}
+- Search music: spotify_control with {{"action": "search", "query": "Imagine Dragons", "type": "track"}}
+- Create playlist: spotify_control with {{"action": "create_playlist", "name": "My Playlist"}}
+- Get playlists: spotify_control with {{"action": "get_playlists"}}
+- Get devices: spotify_control with {{"action": "get_devices"}}
 
 Remember: You are speaking directly to {owner_name}. Be personal, helpful, and remember that you are their dedicated AI assistant.""".format(owner_name=settings.owner_name)
         

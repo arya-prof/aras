@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     telegram_api_hash: Optional[str] = Field(default=None, env="TELEGRAM_API_HASH")
     telegram_phone: Optional[str] = Field(default=None, env="TELEGRAM_PHONE")
     
+    # Spotify Configuration
+    spotify_client_id: Optional[str] = Field(default=None, env="SPOTIFY_CLIENT_ID")
+    spotify_client_secret: Optional[str] = Field(default=None, env="SPOTIFY_CLIENT_SECRET")
+    spotify_redirect_uri: str = Field(default="http://localhost:8080/callback", env="SPOTIFY_REDIRECT_URI")
+    
     # UI Configuration
     ui_theme: str = Field(default="dark", env="UI_THEME")
     ui_scale: float = Field(default=1.0, env="UI_SCALE")

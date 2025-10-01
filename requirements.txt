@@ -57,3 +57,6 @@ pygltflib>=1.15.0
 python-dotenv>=1.0.0
 loguru>=0.7.0
 asyncio-mqtt>=0.16.0
+
+# Music Control
+spotipy>=2.23.0

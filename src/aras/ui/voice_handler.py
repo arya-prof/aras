@@ -385,6 +385,12 @@ class VoiceCommandHandler(QObject):
                 description += "\n  Required parameters: operation (system_info, process_list, disk_usage, memory_usage)"
             elif tool['name'] == 'telegram_manager':
                 description += "\n  Operations: send_message, get_chats, get_chat_info, get_messages, search_messages, create_group, add_users_to_group, remove_users_from_group, get_me, forward_message, delete_message, edit_message"
+            elif tool['name'] == 'spotify_control':
+                description += "\n  MUSIC CONTROL: action (play, pause, skip_next, skip_previous, set_volume, get_current_track, get_devices)"
+                description += "\n  SEARCH: action (search), query (search terms), type (track/artist/album/playlist), limit (number of results)"
+                description += "\n  PLAYLISTS: action (get_playlists, create_playlist, add_to_playlist, remove_from_playlist, get_playlist_tracks)"
+                description += "\n  AUTHENTICATION: action (get_auth_url, authenticate), code (authorization code)"
+                description += "\n  Use this for: 'play music', 'pause music', 'next song', 'search for Imagine Dragons', 'create playlist', 'what's playing?'"
         
         return description
     
