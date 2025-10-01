@@ -54,6 +54,18 @@ Current context: {settings.owner_name} is interacting with you via {context}."""
 TOOL_CALL: tool_name
 PARAMETERS: {{"param1": "value1", "param2": "value2"}}
 
+Examples of correct tool usage:
+- For LIGHT CONTROL, always use arduino_bluetooth_control:
+  * Turn on light one: arduino_bluetooth_control with {{"operation": "control_light", "light_id": "L1", "state": true}}
+  * Turn off light two: arduino_bluetooth_control with {{"operation": "control_light", "light_id": "L2", "state": false}}
+  * Turn on all lights: arduino_bluetooth_control with {{"operation": "control_all_lights", "state": true}}
+  * Turn off all lights: arduino_bluetooth_control with {{"operation": "control_all_lights", "state": false}}
+  * Get Arduino status: arduino_bluetooth_control with {{"operation": "get_status"}}
+- For other operations:
+  * Create file: file_create_remove with {{"operation": "create", "path": "test.txt", "type": "file"}}
+  * Search web: web_search with {{"query": "Python tutorials", "num_results": 5}}
+  * System info: system_control with {{"operation": "system_info"}}
+
 For Telegram operations, you can:
 - Send messages to chats: telegram_manager with operation "send_message"
 - Get chat information: telegram_manager with operation "get_chat_info"  

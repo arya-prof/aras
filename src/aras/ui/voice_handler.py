@@ -21,14 +21,15 @@ except ImportError:
 
 from ..config import settings
 from aras.prompts import prompt_manager
+from ..models import ToolCall, ToolResult, ToolCategory
 from aras.responses import response_manager
 
 
 class VoiceCommandHandler(QObject):
     """Handles voice commands with GPT-4 integration and triggers appropriate actions."""
     
-    home_status_requested = pyqtSignal()
-    home_viewer_requested = pyqtSignal()  # When home viewer app should be shown
+    # UI launching signal (minimal - only for opening the home viewer UI)
+    home_viewer_requested = pyqtSignal()  # When home viewer UI should be opened
     file_operation_requested = pyqtSignal(str, dict)  # operation, parameters
     command_processed = pyqtSignal(str, dict)  # command, result
     voice_response = pyqtSignal(str)  # TTS response
@@ -41,7 +42,7 @@ class VoiceCommandHandler(QObject):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.home_status_callback: Optional[Callable] = None
+        # Removed home_status_callback - now handled by LLM tools
         self.file_operation_callback: Optional[Callable] = None
         self.chatbox_callback: Optional[Callable] = None
         self.arduino_control_callback: Optional[Callable] = None
@@ -134,490 +135,12 @@ class VoiceCommandHandler(QObject):
         except ImportError:
             print("pyttsx3 not available for TTS")
         
-        # Voice command patterns for fallback matching
-        self.home_status_patterns = [
-            r"what.*home.*status",
-            r"show.*home.*status", 
-            r"home.*status",
-            r"what.*happening.*home",
-            r"home.*devices",
-            r"smart.*home",
-            r"lights.*status",
-            r"doors.*status",
-            r"temperature.*status",
-            r"climate.*status",
-            # More flexible patterns
-            r"what.*is.*home",
-            r"what.*home",
-            r"home.*status",
-            r"status.*home",
-            r"show.*home",
-            r"home.*show",
-            r"go.*home",  # Handle "go home" command
-            r"homer.*status",  # Handle "homer" mispronunciation
-            r"home.*state",
-            r"house.*status",
-            r"house.*state",
-            # Additional home viewer patterns
-            r"open.*home.*viewer",
-            r"show.*home.*viewer",
-            r"home.*viewer",
-            r"view.*home",
-            r"home.*control",
-            r"control.*home",
-            r"home.*dashboard",
-            r"dashboard.*home",
-            r"home.*interface",
-            r"interface.*home",
-            r"home.*panel",
-            r"panel.*home",
-            r"home.*monitor",
-            r"monitor.*home",
-            r"home.*visualization",
-            r"visualization.*home",
-            r"home.*3d",
-            r"3d.*home",
-            r"home.*2d",
-            r"2d.*home",
-            # Test commands
-            r"test.*voice",
-            r"voice.*test",
-            r"can.*you.*hear",
-            r"hello.*voice"
-        ]
-        
-        # File operation patterns for voice commands
-        self.file_operation_patterns = [
-            # File creation patterns
-            r"create.*file.*(.+)",
-            r"make.*file.*(.+)",
-            r"new.*file.*(.+)",
-            r"write.*file.*(.+)",
-            r"save.*file.*(.+)",
-            r"create.*a.*file.*(.+)",
-            r"make.*a.*file.*(.+)",
-            r"new.*a.*file.*(.+)",
-            r"write.*a.*file.*(.+)",
-            r"save.*a.*file.*(.+)",
-            
-            # Directory creation patterns
-            r"create.*folder.*(.+)",
-            r"create.*directory.*(.+)",
-            r"make.*folder.*(.+)",
-            r"make.*directory.*(.+)",
-            r"new.*folder.*(.+)",
-            r"new.*directory.*(.+)",
-            r"create.*a.*folder.*(.+)",
-            r"create.*a.*directory.*(.+)",
-            r"make.*a.*folder.*(.+)",
-            r"make.*a.*directory.*(.+)",
-            r"new.*a.*folder.*(.+)",
-            r"new.*a.*directory.*(.+)",
-            
-            # File deletion patterns
-            r"delete.*file.*(.+)",
-            r"remove.*file.*(.+)",
-            r"delete.*(.+)",
-            r"remove.*(.+)",
-            r"delete.*the.*file.*(.+)",
-            r"remove.*the.*file.*(.+)",
-            r"delete.*a.*file.*(.+)",
-            r"remove.*a.*file.*(.+)",
-            
-            # Directory deletion patterns
-            r"delete.*folder.*(.+)",
-            r"delete.*directory.*(.+)",
-            r"remove.*folder.*(.+)",
-            r"remove.*directory.*(.+)",
-            r"delete.*the.*folder.*(.+)",
-            r"delete.*the.*directory.*(.+)",
-            r"remove.*the.*folder.*(.+)",
-            r"remove.*the.*directory.*(.+)",
-            r"delete.*a.*folder.*(.+)",
-            r"delete.*a.*directory.*(.+)",
-            r"remove.*a.*folder.*(.+)",
-            r"remove.*a.*directory.*(.+)",
-            
-            # File existence check patterns
-            r"does.*file.*(.+).*exist",
-            r"is.*file.*(.+).*there",
-            r"check.*if.*file.*(.+).*exists",
-            r"file.*(.+).*exist",
-            r"does.*(.+).*exist",
-            r"is.*(.+).*there",
-            r"check.*(.+).*exists",
-            
-            # File info patterns
-            r"info.*about.*file.*(.+)",
-            r"file.*info.*(.+)",
-            r"details.*about.*file.*(.+)",
-            r"tell.*me.*about.*file.*(.+)",
-            r"what.*about.*file.*(.+)",
-            r"show.*me.*file.*(.+)",
-            r"file.*(.+).*info",
-            r"file.*(.+).*details",
-            
-            # General file operation patterns
-            r"file.*operation",
-            r"file.*management",
-            r"file.*system",
-            r"file.*work",
-            r"work.*with.*files",
-            r"manage.*files",
-            r"handle.*files"
-        ]
-        
-        # Chatbox command patterns
-        self.chatbox_patterns = [
-            r"show.*chat",
-            r"open.*chat",
-            r"chat.*box",
-            r"show.*chatbox",
-            r"open.*chatbox",
-            r"show.*conversation",
-            r"open.*conversation",
-            r"show.*history",
-            r"open.*history",
-            r"chat.*history",
-            r"conversation.*history",
-            r"show.*messages",
-            r"open.*messages",
-            r"display.*chat",
-            r"view.*chat",
-            r"chat.*window",
-            r"message.*window"
-        ]
-        
-        # Chatbox hide patterns
-        self.chatbox_hide_patterns = [
-            r"hide.*chat",
-            r"hide.*chatbox",
-            r"hide.*conversation",
-            r"hide.*history",
-            r"hide.*messages",
-            r"minimize.*chat",
-            r"minimize.*chatbox"
-        ]
-        
-        # Chatbox close patterns
-        self.chatbox_close_patterns = [
-            r"close.*chat",
-            r"close.*chatbox",
-            r"close.*conversation",
-            r"close.*history",
-            r"close.*messages",
-            r"chat.*close",
-            r"chatbox.*close",
-            r"conversation.*close",
-            r"history.*close",
-            r"messages.*close",
-            r"exit.*chat",
-            r"exit.*chatbox",
-            r"quit.*chat",
-            r"quit.*chatbox"
-        ]
-        
-        # Arduino control patterns
-        self.arduino_patterns = [
-            # Light control patterns - with numbers
-            r"turn.*on.*light.*1",
-            r"turn.*on.*l1",
-            r"light.*1.*on",
-            r"l1.*on",
-            r"switch.*on.*light.*1",
-            r"switch.*on.*l1",
-            r"enable.*light.*1",
-            r"enable.*l1",
-            
-            # Light control patterns - with words
-            r"turn.*on.*light.*one",
-            r"turn.*on.*light.*1",
-            r"light.*one.*on",
-            r"light.*1.*on",
-            r"switch.*on.*light.*one",
-            r"switch.*on.*light.*1",
-            r"enable.*light.*one",
-            r"enable.*light.*1",
-            
-            r"turn.*off.*light.*1",
-            r"turn.*off.*l1",
-            r"light.*1.*off",
-            r"l1.*off",
-            r"switch.*off.*light.*1",
-            r"switch.*off.*l1",
-            r"disable.*light.*1",
-            r"disable.*l1",
-            
-            r"turn.*off.*light.*one",
-            r"turn.*off.*light.*1",
-            r"light.*one.*off",
-            r"light.*1.*off",
-            r"switch.*off.*light.*one",
-            r"switch.*off.*light.*1",
-            r"disable.*light.*one",
-            r"disable.*light.*1",
-            
-            r"turn.*on.*light.*2",
-            r"turn.*on.*l2",
-            r"light.*2.*on",
-            r"l2.*on",
-            r"switch.*on.*light.*2",
-            r"switch.*on.*l2",
-            r"enable.*light.*2",
-            r"enable.*l2",
-            
-            r"turn.*on.*light.*two",
-            r"turn.*on.*light.*2",
-            r"light.*two.*on",
-            r"light.*2.*on",
-            r"switch.*on.*light.*two",
-            r"switch.*on.*light.*2",
-            r"enable.*light.*two",
-            r"enable.*light.*2",
-            
-            r"turn.*off.*light.*2",
-            r"turn.*off.*l2",
-            r"light.*2.*off",
-            r"l2.*off",
-            r"switch.*off.*light.*2",
-            r"switch.*off.*l2",
-            r"disable.*light.*2",
-            r"disable.*l2",
-            
-            r"turn.*off.*light.*two",
-            r"turn.*off.*light.*2",
-            r"light.*two.*off",
-            r"light.*2.*off",
-            r"switch.*off.*light.*two",
-            r"switch.*off.*light.*2",
-            r"disable.*light.*two",
-            r"disable.*light.*2",
-            
-            # Toggle patterns
-            r"toggle.*light.*1",
-            r"toggle.*l1",
-            r"switch.*light.*1",
-            r"switch.*l1",
-            
-            r"toggle.*light.*2",
-            r"toggle.*l2",
-            r"switch.*light.*2",
-            r"switch.*l2",
-            
-            # All lights control
-            r"turn.*on.*all.*lights",
-            r"turn.*on.*all.*light",
-            r"all.*lights.*on",
-            r"all.*light.*on",
-            r"switch.*on.*all.*lights",
-            r"switch.*on.*all.*light",
-            r"enable.*all.*lights",
-            r"enable.*all.*light",
-            r"lights.*on",
-            r"light.*on",
-            
-            r"turn.*off.*all.*lights",
-            r"turn.*off.*all.*light",
-            r"all.*lights.*off",
-            r"all.*light.*off",
-            r"switch.*off.*all.*lights",
-            r"switch.*off.*all.*light",
-            r"disable.*all.*lights",
-            r"disable.*all.*light",
-            r"lights.*off",
-            r"light.*off",
-            
-            # Arduino status
-            r"arduino.*status",
-            r"arduino.*state",
-            r"arduino.*info",
-            r"arduino.*ping",
-            r"bluetooth.*status",
-            r"bluetooth.*state",
-            r"device.*status",
-            r"device.*state",
-            r"controller.*status",
-            r"controller.*state",
-            
-            # General Arduino control
-            r"arduino.*control",
-            r"arduino.*command",
-            r"bluetooth.*control",
-            r"bluetooth.*command",
-            r"device.*control",
-            r"device.*command",
-            r"controller.*control",
-            r"controller.*command"
-        ]
-        
-        # Persian home status patterns
-        self.home_status_patterns_fa = [
-            r"وضعیت.*خانه",
-            r"نمایش.*وضعیت.*خانه",
-            r"خانه.*چطوره",
-            r"خانه.*چطور.*است",
-            r"چه.*خبر.*خانه",
-            r"دستگاه.*ها.*خانه",
-            r"خانه.*هوشمند",
-            r"وضعیت.*چراغ",
-            r"وضعیت.*در",
-            r"دما.*چقدر",
-            r"وضعیت.*دما",
-            r"نمایش.*خانه",
-            r"باز.*کن.*خانه",
-            r"کنترل.*خانه",
-            r"داشبورد.*خانه",
-            r"پنل.*خانه",
-            r"مانیتور.*خانه",
-            r"تصویر.*خانه",
-            r"خانه.*سه.*بعدی",
-            r"خانه.*دو.*بعدی",
-        ]
-
-        # Persian Arduino control patterns
-        self.arduino_patterns_fa = [
-            # Light control - چراغ 1 (with both English and Persian numerals)
-            r"روشن.*کن.*چراغ.*یک",
-            r"چراغ.*یک.*روشن",
-            r"چراغ.*اول.*روشن",
-            r"روشن.*کن.*چراغ.*1",
-            r"چراغ.*1.*روشن",
-            r"روشن.*کن.*چراغ.*۱",
-            r"چراغ.*۱.*روشن",
-            r"خاموش.*کن.*چراغ.*یک",
-            r"چراغ.*یک.*خاموش",
-            r"چراغ.*اول.*خاموش",
-            r"خاموش.*کن.*چراغ.*1",
-            r"چراغ.*1.*خاموش",
-            r"خاموش.*کن.*چراغ.*۱",
-            r"چراغ.*۱.*خاموش",
-            r"سوئیچ.*چراغ.*یک",
-            r"تغییر.*چراغ.*یک",
-            r"سوئیچ.*چراغ.*1",
-            r"تغییر.*چراغ.*1",
-            r"سوئیچ.*چراغ.*۱",
-            r"تغییر.*چراغ.*۱",
-            
-            # Light control - چراغ 2 (with both English and Persian numerals)
-            r"روشن.*کن.*چراغ.*دو",
-            r"چراغ.*دو.*روشن",
-            r"چراغ.*دوم.*روشن",
-            r"روشن.*کن.*چراغ.*2",
-            r"چراغ.*2.*روشن",
-            r"روشن.*کن.*چراغ.*۲",
-            r"چراغ.*۲.*روشن",
-            r"خاموش.*کن.*چراغ.*دو",
-            r"چراغ.*دو.*خاموش",
-            r"چراغ.*دوم.*خاموش",
-            r"خاموش.*کن.*چراغ.*2",
-            r"چراغ.*2.*خاموش",
-            r"خاموش.*کن.*چراغ.*۲",
-            r"چراغ.*۲.*خاموش",
-            r"سوئیچ.*چراغ.*دو",
-            r"تغییر.*چراغ.*دو",
-            r"سوئیچ.*چراغ.*2",
-            r"تغییر.*چراغ.*2",
-            r"سوئیچ.*چراغ.*۲",
-            r"تغییر.*چراغ.*۲",
-            
-            # All lights
-            r"روشن.*کن.*همه.*چراغ",
-            r"همه.*چراغ.*روشن",
-            r"چراغ.*ها.*روشن",
-            r"خاموش.*کن.*همه.*چراغ",
-            r"همه.*چراغ.*خاموش",
-            r"چراغ.*ها.*خاموش",
-            r"سوئیچ.*همه.*چراغ",
-            r"تغییر.*همه.*چراغ",
-            
-            # Arduino status
-            r"وضعیت.*آردوینو",
-            r"آردوینو.*چطوره",
-            r"وضعیت.*بلوتوث",
-            r"دستگاه.*آردوینو",
-            r"کنترلر.*وضعیت",
-        ]
-
-        # Chatbox patterns in Persian
-        self.chatbox_patterns_fa = [
-            r"باز.*کن.*چت",
-            r"نمایش.*چت",
-            r"چت.*باکس",
-            r"گفتگو",
-            r"صحبت.*کن",
-            r"چت.*کن",
-            r"پیام.*بده",
-            r"سوال.*بپرس",
-        ]
-
-        # File operation patterns in Persian
-        self.file_operation_patterns_fa = [
-            r"ایجاد.*فایل.*(.+)",
-            r"بساز.*فایل.*(.+)",
-            r"فایل.*جدید.*(.+)",
-            r"حذف.*فایل.*(.+)",
-            r"پاک.*کن.*فایل.*(.+)",
-            r"ساخت.*فایل.*(.+)",
-            r"نوشتن.*فایل.*(.+)",
-        ]
-
-        # Language switching patterns in English
-        self.language_switch_patterns = [
-            r"switch.*to.*persian",
-            r"change.*language.*persian",
-            r"persian.*mode",
-            r"speak.*persian",
-            r"switch.*to.*english",
-            r"change.*language.*english",
-            r"english.*mode",
-            r"speak.*english",
-        ]
-
-        # Language switching patterns in Persian
-        self.language_switch_patterns_fa = [
-            r"تغییر.*زبان.*فارسی",
-            r"فارسی.*شو",
-            r"زبان.*فارسی",
-            r"فارسی.*کن",
-            r"حالا.*فارسی",
-            r"فارسی.*حالا",
-            r"انگلیسی.*شو",
-            r"تغییر.*زبان.*انگلیسی",
-            r"انگلیسی.*کن",
-            r"زبان.*انگلیسی",
-            r"switch.*to.*english",
-            r"change.*language.*english",
-            r"english.*mode",
-            r"speak.*english",
-        ]
-
         # Multi-language support
         self.supported_languages = ['en-US', 'fa-IR']
         self.current_language = 'en-US'
         self.enable_auto_language_detection = True
-
-        # Compile patterns for efficiency
-        self.compiled_home_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns]
-        self.compiled_home_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.home_status_patterns_fa]
-        
-        self.compiled_file_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns]
-        self.compiled_file_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.file_operation_patterns_fa]
-        
-        self.compiled_chatbox_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_patterns]
-        self.compiled_chatbox_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_patterns_fa]
-        
-        self.compiled_chatbox_hide_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_hide_patterns]
-        self.compiled_chatbox_close_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.chatbox_close_patterns]
-        
-        self.compiled_arduino_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.arduino_patterns]
-        self.compiled_arduino_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.arduino_patterns_fa]
-        
-        self.compiled_language_switch_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.language_switch_patterns]
-        self.compiled_language_switch_patterns_fa = [re.compile(pattern, re.IGNORECASE) for pattern in self.language_switch_patterns_fa]
     
-    def set_home_status_callback(self, callback: Callable):
-        """Set the callback function for home status requests."""
-        self.home_status_callback = callback
+    # Removed set_home_status_callback - now handled by LLM tools
     
     def set_file_operation_callback(self, callback: Callable):
         """Set the callback function for file operation requests."""
@@ -636,7 +159,7 @@ class VoiceCommandHandler(QObject):
         self.arduino_control_callback = callback
     
     def process_voice_command(self, text: str, language: str = 'en-US') -> bool:
-        """Optimized voice command processing for real-time performance with multi-language support."""
+        """Process voice commands using LLM tool integration with minimal fallback patterns."""
         import time
         
         text = text.strip()
@@ -653,103 +176,31 @@ class VoiceCommandHandler(QObject):
         self._last_command_text = text
         
         text_lower = text.lower()
-        
-        # Use the passed language parameter instead of automatic detection
         is_persian = language == 'fa-IR'
         
-        # Select appropriate pattern sets
-        if is_persian:
-            home_patterns = self.compiled_home_patterns_fa
-            arduino_patterns = self.compiled_arduino_patterns_fa
-            file_patterns = self.compiled_file_patterns_fa
-            chatbox_patterns = self.compiled_chatbox_patterns_fa
-            chatbox_hide_patterns = self.compiled_chatbox_hide_patterns  # Keep English for now
-            chatbox_close_patterns = self.compiled_chatbox_close_patterns  # Keep English for now
-            language_switch_patterns = self.compiled_language_switch_patterns_fa
-            print("[CMD] Processing Persian command")
-        else:
-            home_patterns = self.compiled_home_patterns
-            arduino_patterns = self.compiled_arduino_patterns
-            file_patterns = self.compiled_file_patterns
-            chatbox_patterns = self.compiled_chatbox_patterns
-            chatbox_hide_patterns = self.compiled_chatbox_hide_patterns
-            chatbox_close_patterns = self.compiled_chatbox_close_patterns
-            language_switch_patterns = self.compiled_language_switch_patterns
-            print(f"[CMD] Processing English command: {text}")
+        print(f"[CMD] Processing {'Persian' if is_persian else 'English'} command: {text}")
         
-        # Fast pattern matching first (no debug overhead)
-        for pattern in chatbox_hide_patterns:
-            if pattern.search(text_lower):
-                self.trigger_chatbox_hide()
-                return True
+        # Check for language switching (keep minimal pattern matching for critical UI commands)
+        if self._is_language_switch_command(text_lower, is_persian):
+            self.trigger_language_switch(text, is_persian)
+            return True
         
-        for pattern in chatbox_close_patterns:
-            if pattern.search(text_lower):
-                self.trigger_chatbox_close()
-                return True
-        
-        for pattern in chatbox_patterns:
-            if pattern.search(text_lower):
-                self.trigger_chatbox()
-                return True
-        
-        # Check language switching patterns
-        for i, pattern in enumerate(language_switch_patterns):
-            if pattern.search(text_lower):
-                command_id = int(time.time() * 1000)
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Language switch pattern {i+1}")
-                print(f"[DEBUG-{command_id}] TRIGGER_LANGUAGE_SWITCH: Triggering language switch")
-                self.trigger_language_switch(text, is_persian)
-                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Language switch successful")
-                return True
-        
-        # Check Arduino control patterns FIRST (before LLM)
-        for i, pattern in enumerate(arduino_patterns):
-            match = pattern.search(text_lower)
-            if match:
-                command_id = int(time.time() * 1000)
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Arduino pattern {i+1}")
-                print(f"[DEBUG-{command_id}] TRIGGER_ARDUINO_CONTROL: Triggering Arduino control")
-                self.trigger_arduino_control(text, match)
-                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
-                return True
-        
-        # Try LLM processing if available (async to avoid blocking)
+        # Primary processing: Use LLM with tool integration
         if self.llm_client:
             try:
-                result = self._process_with_llm(text)
+                result = self._process_with_llm_agent(text)
                 if result['success']:
                     self.command_processed.emit(text, result)
                     return True
             except Exception as e:
                 print(f"[ERROR] LLM processing failed: {e}")
         
-        # Fallback to pattern matching
+        # Minimal fallback: Only for critical UI commands that need immediate response
+        if self._is_critical_ui_command(text_lower):
+            self._handle_critical_ui_command(text_lower)
+            return True
         
-        # Check home status patterns
-        for i, pattern in enumerate(home_patterns):
-            if pattern.search(text_lower):
-                command_id = int(time.time() * 1000)
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: Home pattern {i+1}")
-                print(f"[DEBUG-{command_id}] TRIGGER_HOME_STATUS: Triggering home status")
-                self.trigger_home_status()
-                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
-                return True
-        
-        # Check file operation patterns
-        for i, pattern in enumerate(file_patterns):
-            match = pattern.search(text_lower)
-            if match:
-                command_id = int(time.time() * 1000)
-                print(f"[DEBUG-{command_id}] PATTERN_MATCHED: File pattern {i+1}")
-                print(f"[DEBUG-{command_id}] TRIGGER_FILE_OPERATION: Triggering file operation")
-                self.trigger_file_operation(text, match)
-                print(f"[DEBUG-{command_id}] PROCESSING_COMPLETE: Pattern matching successful")
-                return True
-        
-        command_id = int(time.time() * 1000)
-        print(f"[DEBUG-{command_id}] NO_MATCH: No patterns matched for: '{text}'")
-        print(f"[DEBUG-{command_id}] PROCESSING_FAILED: Command not recognized")
+        print(f"[CMD] Command not recognized: '{text}'")
         return False
     
     def _contains_persian(self, text: str) -> bool:
@@ -757,8 +208,91 @@ class VoiceCommandHandler(QObject):
         persian_pattern = re.compile(r'[\u0600-\u06FF]')
         return bool(persian_pattern.search(text))
     
+    def _is_language_switch_command(self, text_lower: str, is_persian: bool) -> bool:
+        """Check if command is a language switch request."""
+        if is_persian:
+            # Persian to English switch commands
+            return any(word in text_lower for word in ['انگلیسی', 'english', 'switch to english', 'change to english'])
+        else:
+            # English to Persian switch commands
+            return any(word in text_lower for word in ['فارسی', 'persian', 'switch to persian', 'change to persian'])
+    
+    def _is_critical_ui_command(self, text_lower: str) -> bool:
+        """Check if command is a critical UI command that needs immediate response."""
+        # Only keep essential UI commands that need immediate response
+        critical_commands = [
+            'hide chat', 'hide chatbox', 'close chat', 'close chatbox',
+            'show chat', 'show chatbox', 'open chat', 'open chatbox'
+        ]
+        return any(cmd in text_lower for cmd in critical_commands)
+    
+    def _handle_critical_ui_command(self, text_lower: str):
+        """Handle critical UI commands that need immediate response."""
+        if any(word in text_lower for word in ['hide chat', 'hide chatbox']):
+            self.trigger_chatbox_hide()
+        elif any(word in text_lower for word in ['close chat', 'close chatbox']):
+            self.trigger_chatbox_close()
+        elif any(word in text_lower for word in ['show chat', 'show chatbox', 'open chat', 'open chatbox']):
+            self.trigger_chatbox()
+    
+    def _process_with_llm_agent(self, command: str) -> Dict[str, Any]:
+        """Process command using LLM with proper tool selection (like main agent)."""
+        try:
+            print("[DEBUG-LLM-AGENT] Starting LLM agent processing")
+            print(f"[DEBUG-LLM-AGENT] LLM client type: {type(self.llm_client)}")
+            print(f"[DEBUG-LLM-AGENT] LLM client available: {self.llm_client is not None}")
+            
+            if not self.llm_client:
+                print("[DEBUG-LLM-AGENT] ERROR: No LLM client available")
+                return {
+                    'success': False,
+                    'error': 'No LLM client available',
+                    'response': response_manager.get_error_response('ai_unavailable')
+                }
+            
+            # Get available tools for the LLM (same as main agent)
+            available_tools = self._get_available_tools()
+            tools_description = self._format_tools_description(available_tools)
+            
+            # Use centralized prompt manager (same as main agent)
+            prompt = prompt_manager.get_text_chat_prompt(tools_description)
+            
+            # Add the conversation context
+            prompt += f"""
+
+{settings.owner_name}: {command}
+{settings.agent_name}:"""
+            
+            print(f"[DEBUG-LLM-AGENT] Sending prompt to LLM")
+            response = self.llm_client.invoke(prompt)
+            print(f"[DEBUG-LLM-AGENT] Received response type: {type(response)}")
+            
+            response_text = response.content if hasattr(response, 'content') else str(response)
+            print(f"[DEBUG-LLM-AGENT] Response content: {response_text}")
+            
+            # Check if the response contains tool calls (same as main agent)
+            if "TOOL_CALL:" in response_text:
+                response_text = self._process_tool_calls_sync(response_text, command)
+            
+            return {
+                'success': True,
+                'response': response_text,
+                'command': command
+            }
+            
+        except Exception as e:
+            print(f"[DEBUG-LLM-AGENT] ERROR: Exception in LLM agent processing: {e}")
+            print(f"[DEBUG-LLM-AGENT] ERROR: Exception type: {type(e)}")
+            import traceback
+            print(f"[DEBUG-LLM-AGENT] ERROR: Traceback: {traceback.format_exc()}")
+            return {
+                'success': False,
+                'error': str(e),
+                'response': response_manager.get_error_response('command_error')
+            }
+
     def _process_with_llm(self, command: str) -> Dict[str, Any]:
-        """Process command using LLM for natural language understanding."""
+        """Process command using LLM for natural language understanding (legacy method)."""
         try:
             print("[DEBUG-LLM] Starting LLM processing")
             print(f"[DEBUG-LLM] LLM client type: {type(self.llm_client)}")
@@ -811,398 +345,221 @@ class VoiceCommandHandler(QObject):
                 'response': response_manager.get_error_response('command_error')
             }
     
-    def _extract_and_execute_actions(self, command: str, chat_response: str) -> Dict[str, Any]:
-        """Extract and execute actions from the command."""
-        try:
-            action_result = {
-                'action_taken': False,
-                'actions': [],
-                'execution_results': []
-            }
-            
-            command_lower = command.lower()
-            
-            # Raspberry Pi commands - CHECK THIS FIRST (before other status checks)
-            if any(word in command_lower for word in ['raspberry', 'pi', 'gpio', 'pin', 'led', 'relay', 'sensor']):
-                action_result['actions'].append({
-                    'type': 'raspberry_pi',
-                    'description': 'Control Raspberry Pi devices and GPIO'
+    def _get_available_tools(self) -> List[Dict[str, Any]]:
+        """Get available tools for the LLM (same as main agent)."""
+        if not self.tool_registry:
+            return []
+        
+        tools = []
+        for tool in self.tool_registry.get_all_tools():
+            if tool.enabled:
+                tools.append({
+                    'name': tool.name,
+                    'description': tool.description,
+                    'parameters': tool.get_parameters_schema()
                 })
-                action_result['action_taken'] = True
-                
-                # Execute mock Pi tool
-                asyncio.run(self._execute_pi_command(command, action_result))
-            
-            # Home status requests - more flexible detection
-            elif any(word in command_lower for word in ['home', 'status', 'devices', 'lights', 'temperature', 'climate', 'dashboard', 'viewer', 'control', 'panel', 'monitor', 'interface', 'visualization']):
-                # Check for home-related commands that should trigger the home viewer
-                home_trigger_words = ['status', 'show', 'what', 'how', 'dashboard', 'viewer', 'control', 'panel', 'monitor', 'interface', 'visualization', 'view', 'open', 'display']
-                if any(word in command_lower for word in home_trigger_words):
-                    action_result['actions'].append({
-                        'type': 'home_status',
-                        'description': 'Show home status and device information'
-                    })
-                    action_result['action_taken'] = True
-                    # Trigger the home status signal
-                    self.trigger_home_status()
-            
-            # System status requests
-            elif any(word in command_lower for word in ['system', 'cpu', 'memory', 'disk', 'performance']):
-                action_result['actions'].append({
-                    'type': 'system_status',
-                    'description': 'Show system performance and resource usage'
-                })
-                action_result['action_taken'] = True
-            
-            # File operations
-            elif any(word in command_lower for word in ['file', 'folder', 'directory', 'create', 'delete', 'remove', 'list', 'write', 'save', 'make', 'new']):
-                action_result['actions'].append({
-                    'type': 'file_operation',
-                    'description': 'Perform file system operations',
-                    'command': command,
-                    'details': 'File creation, deletion, or management operation'
-                })
-                action_result['action_taken'] = True
-                
-                # Try to extract file operation details and execute
-                if any(word in command_lower for word in ['create', 'make', 'new', 'write', 'save']):
-                    if any(word in command_lower for word in ['file']):
-                        action_result['file_operation'] = 'create_file'
-                        # Execute file creation
-                        self._execute_file_creation(command, action_result)
-                    elif any(word in command_lower for word in ['folder', 'directory']):
-                        action_result['file_operation'] = 'create_directory'
-                        # Execute directory creation
-                        self._execute_directory_creation(command, action_result)
-                elif any(word in command_lower for word in ['delete', 'remove']):
-                    if any(word in command_lower for word in ['file']):
-                        action_result['file_operation'] = 'remove_file'
-                    elif any(word in command_lower for word in ['folder', 'directory']):
-                        action_result['file_operation'] = 'remove_directory'
-                elif any(word in command_lower for word in ['exist', 'check', 'info', 'details']):
-                    action_result['file_operation'] = 'check_file'
-            
-            # Web search
-            elif any(word in command_lower for word in ['search', 'google', 'find', 'look up', 'web']):
-                action_result['actions'].append({
-                    'type': 'web_search',
-                    'description': 'Search the web for information'
-                })
-                action_result['action_taken'] = True
-            
-            # Communication
-            elif any(word in command_lower for word in ['email', 'send', 'message', 'notify', 'call']):
-                action_result['actions'].append({
-                    'type': 'communication',
-                    'description': 'Send messages or notifications'
-                })
-                action_result['action_taken'] = True
-            
-            return action_result
-            
-        except Exception as e:
-            return {'action_taken': False, 'actions': [], 'error': str(e)}
+        return tools
     
-    def _execute_file_creation(self, command: str, action_result: Dict[str, Any]):
-        """Execute file creation using the tool registry."""
+    def _format_tools_description(self, tools: List[Dict[str, Any]]) -> str:
+        """Format tools description for the LLM (same as main agent)."""
+        if not tools:
+            return "No tools available."
+        
+        description = "Available tools:\n"
+        for tool in tools:
+            description += f"\n- {tool['name']}: {tool['description']}"
+            
+            # Add specific parameter information for key tools
+            if tool['name'] == 'arduino_bluetooth_control':
+                description += "\n  PRIMARY LIGHT CONTROL: operation (control_light, control_all_lights, get_status), light_id (L1, L2), state (true/false)"
+                description += "\n  Use this for: 'turn on light one', 'turn off light two', 'turn on all lights', 'Arduino status'"
+            elif tool['name'] == 'device_control':
+                description += "\n  Required parameters: operation (turn_on, turn_off, toggle, get_state, list_devices), entity_id (e.g., light.living_room)"
+                description += "\n  Note: Use arduino_bluetooth_control for light control instead"
+                description += "\n  UI: For 'open home viewer' or 'show home interface', call trigger_home_viewer_ui()"
+            elif tool['name'] == 'file_create_remove':
+                description += "\n  Required parameters: operation (create, remove), path (file/folder path), type (file or directory)"
+            elif tool['name'] == 'web_search':
+                description += "\n  Required parameters: query (search terms), num_results (number of results)"
+            elif tool['name'] == 'system_control':
+                description += "\n  Required parameters: operation (system_info, process_list, disk_usage, memory_usage)"
+            elif tool['name'] == 'telegram_manager':
+                description += "\n  Operations: send_message, get_chats, get_chat_info, get_messages, search_messages, create_group, add_users_to_group, remove_users_from_group, get_me, forward_message, delete_message, edit_message"
+        
+        return description
+    
+    def _process_tool_calls_sync(self, response_text: str, command: str) -> str:
+        """Process tool calls synchronously (adapted from main agent)."""
+        import json
+        import uuid
+        
+        lines = response_text.split('\n')
+        processed_response = []
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            if line.startswith("TOOL_CALL:"):
+                tool_name = line.replace("TOOL_CALL:", "").strip()
+                
+                # Look for parameters in the next line
+                if i + 1 < len(lines) and lines[i + 1].strip().startswith("PARAMETERS:"):
+                    params_line = lines[i + 1].strip().replace("PARAMETERS:", "").strip()
+                    try:
+                        parameters = json.loads(params_line)
+                        
+                        # Get tool category from registry
+                        tool = self.tool_registry.get_tool(tool_name)
+                        category = tool.category if tool else ToolCategory.SYSTEM
+                        
+                        # Special case for UI launching commands
+                        if tool_name == "trigger_home_viewer_ui":
+                            self.trigger_home_viewer_ui()
+                            result = ToolResult(
+                                call_id=str(uuid.uuid4()),
+                                success=True,
+                                result="Home viewer UI launched",
+                                execution_time=0.0
+                            )
+                        else:
+                            # Execute the tool synchronously
+                            tool_call = ToolCall(
+                                id=str(uuid.uuid4()),
+                                tool_name=tool_name,
+                                category=category,
+                                parameters=parameters,
+                                session_id="voice_command"
+                            )
+                            
+                            result = self._execute_tool_sync(tool_call)
+                        
+                        # Only add user-friendly messages, not technical details
+                        if result.success:
+                            # For voice commands, don't add technical execution details
+                            # The LLM response already contains the user-friendly message
+                            pass  # Don't add anything - let the LLM response speak for itself
+                        else:
+                            # Only add error messages if they're user-friendly
+                            processed_response.append(f"Sorry, I couldn't complete that action: {result.error}")
+                        
+                        # Skip the parameters line
+                        i += 2
+                        continue
+                        
+                    except json.JSONDecodeError as e:
+                        processed_response.append(f"❌ Invalid parameters for {tool_name}: {e}")
+                        i += 2
+                        continue
+                else:
+                    processed_response.append(f"❌ No parameters found for {tool_name}")
+            
+            # Check for plain text function calls (special case for UI launching)
+            elif line == "trigger_home_viewer_ui()":
+                print("[DEBUG-TOOL-CALL] Detected plain text trigger_home_viewer_ui() call")
+                self.trigger_home_viewer_ui()
+                # Don't add the function call to the response, just skip it
+                i += 1
+                continue
+            
+            processed_response.append(line)
+            i += 1
+        
+        return '\n'.join(processed_response)
+    
+    def _execute_tool_sync(self, tool_call: ToolCall) -> ToolResult:
+        """Execute a tool call synchronously (adapted from main agent)."""
+        from datetime import datetime
+        
+        start_time = datetime.now()
+        
         try:
             if not self.tool_registry:
-                print("[DEBUG-FILE] ERROR: No tool registry available")
-                return
+                return ToolResult(
+                    call_id=tool_call.id,
+                    success=False,
+                    result=None,
+                    error="Tool registry not available",
+                    execution_time=0.0
+                )
             
-            # Extract filename from command
-            filename = self._extract_filename_from_command(command)
-            if not filename:
-                print("[DEBUG-FILE] ERROR: Could not extract filename from command")
-                return
-            
-            # Determine file path (default to desktop if not specified)
-            file_path = self._get_file_path(filename, command)
-            
-            # Get the file creation tool
-            tool = self.tool_registry.get_tool("file_create_remove")
+            tool = self.tool_registry.get_tool(tool_call.tool_name)
             if not tool:
-                print("[DEBUG-FILE] ERROR: File creation tool not found")
-                return
+                return ToolResult(
+                    call_id=tool_call.id,
+                    success=False,
+                    result=None,
+                    error=f"Tool '{tool_call.tool_name}' not found",
+                    execution_time=0.0
+                )
             
-            # Prepare parameters
-            parameters = {
-                "operation": "create_file",
-                "path": file_path,
-                "content": "",  # Empty file
-                "encoding": "utf-8"
-            }
-            
-            print(f"[DEBUG-FILE] EXECUTING: Creating file at {file_path}")
-            
-            # Execute the tool asynchronously
+            # Execute tool synchronously - handle event loop conflicts
             import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            import threading
+            
+            # Check if we're already in an event loop
             try:
-                result = loop.run_until_complete(tool.execute(parameters))
-                print(f"[DEBUG-FILE] RESULT: {result}")
+                current_loop = asyncio.get_running_loop()
+                # We're in an event loop, run in a separate thread
+                result_container = [None]
+                exception_container = [None]
                 
-                # Update action result with execution details
-                action_result['execution_results'].append({
-                    'tool': 'file_create_remove',
-                    'operation': 'create_file',
-                    'path': file_path,
-                    'result': result
-                })
+                def run_in_thread():
+                    try:
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        result_container[0] = new_loop.run_until_complete(tool.execute(tool_call.parameters))
+                        new_loop.close()
+                    except Exception as e:
+                        exception_container[0] = e
                 
-            finally:
-                loop.close()
+                thread = threading.Thread(target=run_in_thread)
+                thread.start()
+                thread.join(timeout=10)  # 10 second timeout
                 
+                if thread.is_alive():
+                    return ToolResult(
+                        call_id=tool_call.id,
+                        success=False,
+                        result=None,
+                        error="Tool execution timed out",
+                        execution_time=(datetime.now() - start_time).total_seconds()
+                    )
+                
+                if exception_container[0]:
+                    raise exception_container[0]
+                
+                result = result_container[0]
+                
+            except RuntimeError:
+                # No event loop running, we can create one
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(tool.execute(tool_call.parameters))
+                finally:
+                    loop.close()
+            
+            execution_time = (datetime.now() - start_time).total_seconds()
+            
+            return ToolResult(
+                call_id=tool_call.id,
+                success=True,
+                result=result,
+                execution_time=execution_time
+            )
+            
         except Exception as e:
-            print(f"[DEBUG-FILE] ERROR: File creation failed: {e}")
-            action_result['execution_results'].append({
-                'tool': 'file_create_remove',
-                'operation': 'create_file',
-                'error': str(e)
-            })
+            execution_time = (datetime.now() - start_time).total_seconds()
+            return ToolResult(
+                call_id=tool_call.id,
+                success=False,
+                result=None,
+                error=str(e),
+                execution_time=execution_time
+            )
+
     
-    def _execute_directory_creation(self, command: str, action_result: Dict[str, Any]):
-        """Execute directory creation using the tool registry."""
-        try:
-            if not self.tool_registry:
-                print("[DEBUG-FILE] ERROR: No tool registry available")
-                return
-            
-            # Extract directory name from command
-            dirname = self._extract_directory_name_from_command(command)
-            if not dirname:
-                print("[DEBUG-FILE] ERROR: Could not extract directory name from command")
-                return
-            
-            # Determine directory path
-            dir_path = self._get_directory_path(dirname, command)
-            
-            # Get the file creation tool
-            tool = self.tool_registry.get_tool("file_create_remove")
-            if not tool:
-                print("[DEBUG-FILE] ERROR: File creation tool not found")
-                return
-            
-            # Prepare parameters
-            parameters = {
-                "operation": "create_directory",
-                "path": dir_path
-            }
-            
-            print(f"[DEBUG-FILE] EXECUTING: Creating directory at {dir_path}")
-            
-            # Execute the tool asynchronously
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(tool.execute(parameters))
-                print(f"[DEBUG-FILE] RESULT: {result}")
-                
-                # Update action result with execution details
-                action_result['execution_results'].append({
-                    'tool': 'file_create_remove',
-                    'operation': 'create_directory',
-                    'path': dir_path,
-                    'result': result
-                })
-                
-            finally:
-                loop.close()
-                
-        except Exception as e:
-            print(f"[DEBUG-FILE] ERROR: Directory creation failed: {e}")
-            action_result['execution_results'].append({
-                'tool': 'file_create_remove',
-                'operation': 'create_directory',
-                'error': str(e)
-            })
-    
-    def _extract_filename_from_command(self, command: str) -> str:
-        """Extract filename from voice command."""
-        import re
-        
-        # Look for patterns like "hello.txt", "hello dot txt", "hello Dot txt"
-        patterns = [
-            r'(\w+(?:\s+dot\s+)?\w+\.\w+)',  # hello.txt or hello dot txt
-            r'(\w+(?:\s+dot\s+)?\w+)\s+(?:file|txt)',  # hello file or hello txt
-            r'name\s+it\s+(\w+(?:\s+dot\s+)?\w+)',  # name it hello
-            r'create\s+(\w+(?:\s+dot\s+)?\w+)',  # create hello
-            r'make\s+(\w+(?:\s+dot\s+)?\w+)',  # make hello
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, command.lower())
-            if match:
-                filename = match.group(1)
-                # Convert "dot" to "."
-                filename = re.sub(r'\s+dot\s+', '.', filename)
-                # Add .txt extension if not present
-                if '.' not in filename:
-                    filename += '.txt'
-                return filename
-        
-        return None
-    
-    def _extract_directory_name_from_command(self, command: str) -> str:
-        """Extract directory name from voice command."""
-        import re
-        
-        patterns = [
-            r'(\w+)\s+(?:folder|directory)',  # hello folder
-            r'create\s+(\w+)\s+(?:folder|directory)',  # create hello folder
-            r'make\s+(\w+)\s+(?:folder|directory)',  # make hello folder
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, command.lower())
-            if match:
-                return match.group(1)
-        
-        return None
-    
-    def _get_file_path(self, filename: str, command: str) -> str:
-        """Get the full file path based on command context."""
-        import os
-        from pathlib import Path
-        
-        # Check if desktop is mentioned
-        if 'desktop' in command.lower():
-            desktop_path = Path.home() / 'Desktop'
-            return str(desktop_path / filename)
-        
-        # Check if specific path is mentioned
-        # For now, default to desktop
-        desktop_path = Path.home() / 'Desktop'
-        return str(desktop_path / filename)
-    
-    def _get_directory_path(self, dirname: str, command: str) -> str:
-        """Get the full directory path based on command context."""
-        import os
-        from pathlib import Path
-        
-        # Check if desktop is mentioned
-        if 'desktop' in command.lower():
-            desktop_path = Path.home() / 'Desktop'
-            return str(desktop_path / dirname)
-        
-        # Check if specific path is mentioned
-        # For now, default to desktop
-        desktop_path = Path.home() / 'Desktop'
-        return str(desktop_path / dirname)
-    
-    async def _execute_pi_command(self, command: str, action_result: Dict[str, Any]):
-        """Execute Raspberry Pi commands using the mock Pi tool."""
-        try:
-            if not self.tool_registry:
-                print("[DEBUG-PI] ERROR: No tool registry available")
-                return
-            
-            # Get the mock Pi tool
-            pi_tool = self.tool_registry.get_tool("mock_pi_control")
-            if not pi_tool:
-                print("[DEBUG-PI] ERROR: Mock Pi tool not found")
-                return
-            
-            command_lower = command.lower()
-            
-            # Initialize tool if needed
-            if not hasattr(pi_tool, '_initialized') or not pi_tool._initialized:
-                await pi_tool.initialize()
-                pi_tool._initialized = True
-            
-            # Determine operation based on command
-            if any(word in command_lower for word in ['status', 'temperature', 'memory', 'uptime', 'info']):
-                # System info request
-                result = await pi_tool.execute({
-                    "operation": "get_system_info"
-                })
-                action_result['execution_results'].append({
-                    'tool': 'mock_pi_control',
-                    'operation': 'get_system_info',
-                    'result': result
-                })
-                print(f"[DEBUG-PI] System info result: {result}")
-                
-            elif any(word in command_lower for word in ['turn on', 'turn off', 'set', 'control']):
-                if any(word in command_lower for word in ['led', 'light']):
-                    # LED control
-                    pin = self._extract_pin_number(command)
-                    brightness = self._extract_brightness(command)
-                    
-                    result = await pi_tool.execute({
-                        "operation": "control_light",
-                        "pin": pin or 18,
-                        "brightness": brightness or 100
-                    })
-                    action_result['execution_results'].append({
-                        'tool': 'mock_pi_control',
-                        'operation': 'control_light',
-                        'result': result
-                    })
-                    print(f"[DEBUG-PI] LED control result: {result}")
-                    
-                elif any(word in command_lower for word in ['relay', 'switch']):
-                    # Relay control
-                    pin = self._extract_pin_number(command)
-                    state = any(word in command_lower for word in ['on', 'turn on', 'enable'])
-                    
-                    result = await pi_tool.execute({
-                        "operation": "control_relay",
-                        "pin": pin or 21,
-                        "state": state
-                    })
-                    action_result['execution_results'].append({
-                        'tool': 'mock_pi_control',
-                        'operation': 'control_relay',
-                        'result': result
-                    })
-                    print(f"[DEBUG-PI] Relay control result: {result}")
-                    
-            elif any(word in command_lower for word in ['read', 'check', 'sensor']):
-                # Sensor reading
-                pin = self._extract_pin_number(command)
-                
-                result = await pi_tool.execute({
-                    "operation": "read_sensor",
-                    "pin": pin or 24,
-                    "sensor_type": "digital"
-                })
-                action_result['execution_results'].append({
-                    'tool': 'mock_pi_control',
-                    'operation': 'read_sensor',
-                    'result': result
-                })
-                print(f"[DEBUG-PI] Sensor read result: {result}")
-                
-        except Exception as e:
-            print(f"[DEBUG-PI] ERROR: Failed to execute Pi command: {e}")
-            action_result['execution_results'].append({
-                'tool': 'mock_pi_control',
-                'error': str(e)
-            })
-    
-    def _extract_pin_number(self, command: str) -> int:
-        """Extract pin number from command."""
-        import re
-        # Look for "pin X" or "pinX" patterns
-        match = re.search(r'pin\s*(\d+)', command.lower())
-        if match:
-            return int(match.group(1))
-        return None
-    
-    def _extract_brightness(self, command: str) -> int:
-        """Extract brightness percentage from command."""
-        import re
-        # Look for percentage patterns like "75%" or "75 percent"
-        match = re.search(r'(\d+)%', command)
-        if match:
-            return int(match.group(1))
-        match = re.search(r'(\d+)\s*percent', command.lower())
-        if match:
-            return int(match.group(1))
-        return None
     
     def speak_response(self, text: str):
         """Convert text to speech using pyttsx3 only."""
@@ -1299,14 +656,13 @@ class VoiceCommandHandler(QObject):
         """Process a text command (same as voice but for text input)."""
         return self.process_voice_command(text)
     
-    def trigger_home_status(self):
-        """Trigger the home status visualization."""
-        print("Triggering home status visualization...")
-        # Emit the signal to trigger home status
-        self.home_status_requested.emit()
-        # Also emit the home viewer signal to pop up the home viewer app
+    # Removed trigger_home_status - now handled by LLM tools through device_control, scene_management, etc.
+    
+    def trigger_home_viewer_ui(self):
+        """Trigger the home viewer UI to open."""
+        print("Triggering home viewer UI...")
         self.home_viewer_requested.emit()
-        print("Signals emitted for home status and home viewer")
+        print("Home viewer UI signal emitted")
     
     def trigger_chatbox(self):
         """Trigger the chatbox display."""
@@ -1385,312 +741,7 @@ class VoiceCommandHandler(QObject):
         print(f"Language switched to: {new_language}")
         print("=== LANGUAGE SWITCH TRIGGER COMPLETE ===")
     
-    def trigger_file_operation(self, text: str, match):
-        """Trigger a file operation based on voice command."""
-        print(f"Triggering file operation for: '{text}'")
-        
-        # Extract the file path from the match
-        file_path = ""
-        if match.groups():
-            file_path = match.group(1).strip()
-        
-        # Determine operation type based on the text
-        text_lower = text.lower()
-        operation = None
-        parameters = {}
-        
-        # File creation
-        if any(word in text_lower for word in ['create', 'make', 'new', 'write', 'save']) and any(word in text_lower for word in ['file']):
-            operation = "create_file"
-            parameters = {
-                "operation": "create_file",
-                "path": file_path,
-                "content": "",  # Default empty content
-                "encoding": "utf-8"
-            }
-            if not file_path:
-                # Ask for file name
-                self.speak_response(response_manager.get_interactive_prompt('file_name_request'))
-                return
-        
-        # Directory creation
-        elif any(word in text_lower for word in ['create', 'make', 'new']) and any(word in text_lower for word in ['folder', 'directory']):
-            operation = "create_directory"
-            parameters = {
-                "operation": "create_directory",
-                "path": file_path
-            }
-            if not file_path:
-                # Ask for directory name
-                self.speak_response(response_manager.get_interactive_prompt('folder_name_request'))
-                return
-        
-        # File deletion
-        elif any(word in text_lower for word in ['delete', 'remove']) and any(word in text_lower for word in ['file']):
-            operation = "remove_file"
-            parameters = {
-                "operation": "remove_file",
-                "path": file_path
-            }
-            if not file_path:
-                # Ask for file name
-                self.speak_response(response_manager.get_interactive_prompt('file_delete_request'))
-                return
-        
-        # Directory deletion
-        elif any(word in text_lower for word in ['delete', 'remove']) and any(word in text_lower for word in ['folder', 'directory']):
-            operation = "remove_directory"
-            parameters = {
-                "operation": "remove_directory",
-                "path": file_path,
-                "force": True
-            }
-            if not file_path:
-                # Ask for directory name
-                self.speak_response(response_manager.get_interactive_prompt('folder_delete_request'))
-                return
-        
-        # File existence check
-        elif any(word in text_lower for word in ['exist', 'there', 'check']):
-            operation = "exists"
-            parameters = {
-                "operation": "exists",
-                "path": file_path
-            }
-            if not file_path:
-                # Ask for file name
-                self.speak_response(response_manager.get_interactive_prompt('file_check_request'))
-                return
-        
-        # File info
-        elif any(word in text_lower for word in ['info', 'details', 'about', 'tell', 'show']):
-            operation = "get_info"
-            parameters = {
-                "operation": "get_info",
-                "path": file_path
-            }
-            if not file_path:
-                # Ask for file name
-                self.speak_response(response_manager.get_interactive_prompt('file_info_request'))
-                return
-        
-        # General file operations
-        else:
-            operation = "file_operation"
-            parameters = {
-                "operation": "general",
-                "path": file_path or "current directory"
-            }
-        
-        if operation:
-            print(f"File operation: {operation} with parameters: {parameters}")
-            # Emit the signal to trigger file operation
-            self.file_operation_requested.emit(operation, parameters)
-            print("Signal emitted for file operation")
-        else:
-            print("Could not determine file operation type")
-            self.speak_response(response_manager.get_error_response('file_operation_unknown'))
     
-    def trigger_arduino_control(self, text: str, match):
-        """Trigger Arduino control based on voice command with multi-language support."""
-        print("Triggering Arduino control for Persian command")
-        
-        text_lower = text.lower()
-        operation = None
-        parameters = {}
-        
-        # Check if it's a Persian command
-        is_persian = self._contains_persian(text)
-        
-        if is_persian:
-            # Persian command processing
-            # Light 1 control (چراغ یک)
-            if any(word in text_lower for word in ['چراغ یک', 'چراغ اول', 'چراغ 1', 'چراغ ۱']) and any(word in text_lower for word in ['روشن', 'روشن کن']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L1",
-                    "state": True
-                }
-            elif any(word in text_lower for word in ['چراغ یک', 'چراغ اول', 'چراغ 1', 'چراغ ۱']) and any(word in text_lower for word in ['خاموش', 'خاموش کن']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L1",
-                    "state": False
-                }
-            elif any(word in text_lower for word in ['چراغ یک', 'چراغ اول', 'چراغ 1', 'چراغ ۱']) and any(word in text_lower for word in ['تغییر', 'سوئیچ']):
-                operation = "toggle_light"
-                parameters = {
-                    "operation": "toggle_light",
-                    "light_id": "L1"
-                }
-            
-            # Light 2 control (چراغ دو)
-            elif any(word in text_lower for word in ['چراغ دو', 'چراغ دوم', 'چراغ 2', 'چراغ ۲']) and any(word in text_lower for word in ['روشن', 'روشن کن']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L2",
-                    "state": True
-                }
-            elif any(word in text_lower for word in ['چراغ دو', 'چراغ دوم', 'چراغ 2', 'چراغ ۲']) and any(word in text_lower for word in ['خاموش', 'خاموش کن']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L2",
-                    "state": False
-                }
-            elif any(word in text_lower for word in ['چراغ دو', 'چراغ دوم', 'چراغ 2', 'چراغ ۲']) and any(word in text_lower for word in ['تغییر', 'سوئیچ']):
-                operation = "toggle_light"
-                parameters = {
-                    "operation": "toggle_light",
-                    "light_id": "L2"
-                }
-            
-            # All lights control (همه چراغ)
-            elif any(word in text_lower for word in ['همه چراغ', 'چراغ ها', 'همه چراغ ها']) and any(word in text_lower for word in ['روشن', 'روشن کن']):
-                operation = "control_all_lights"
-                parameters = {
-                    "operation": "control_all_lights",
-                    "state": True
-                }
-            elif any(word in text_lower for word in ['همه چراغ', 'چراغ ها', 'همه چراغ ها']) and any(word in text_lower for word in ['خاموش', 'خاموش کن']):
-                operation = "control_all_lights"
-                parameters = {
-                    "operation": "control_all_lights",
-                    "state": False
-                }
-            
-            # Arduino status
-            elif any(word in text_lower for word in ['وضعیت آردوینو', 'آردوینو چطوره', 'وضعیت بلوتوث', 'دستگاه آردوینو', 'کنترلر وضعیت']):
-                operation = "arduino_status"
-                parameters = {
-                    "operation": "arduino_status"
-                }
-        
-        else:
-            # English command processing
-            # Light 1 control
-            if any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L1",
-                    "state": True
-                }
-            elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L1",
-                    "state": False
-                }
-            elif any(word in text_lower for word in ['light 1', 'l1', 'light one', 'light 1']) and any(word in text_lower for word in ['toggle', 'switch']):
-                operation = "toggle_light"
-                parameters = {
-                    "operation": "toggle_light",
-                    "light_id": "L1"
-                }
-            
-            # Light 2 control
-            elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L2",
-                    "state": True
-                }
-            elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
-                operation = "control_light"
-                parameters = {
-                    "operation": "control_light",
-                    "light_id": "L2",
-                    "state": False
-                }
-            elif any(word in text_lower for word in ['light 2', 'l2', 'light two', 'light 2']) and any(word in text_lower for word in ['toggle', 'switch']):
-                operation = "toggle_light"
-                parameters = {
-                    "operation": "toggle_light",
-                    "light_id": "L2"
-                }
-            
-            # All lights control
-            elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['on', 'enable', 'switch on']):
-                operation = "control_all_lights"
-                parameters = {
-                    "operation": "control_all_lights",
-                    "state": True
-                }
-            elif any(word in text_lower for word in ['all lights', 'all light', 'lights', 'light']) and any(word in text_lower for word in ['off', 'disable', 'switch off']):
-                operation = "control_all_lights"
-                parameters = {
-                    "operation": "control_all_lights",
-                    "state": False
-                }
-            
-            # Arduino status
-            elif any(word in text_lower for word in ['arduino', 'bluetooth', 'device', 'controller']) and any(word in text_lower for word in ['status', 'state', 'info', 'ping']):
-                operation = "get_status"
-                parameters = {
-                    "operation": "get_status"
-                }
-            
-            # Ping
-            elif any(word in text_lower for word in ['ping', 'test']):
-                operation = "ping"
-                parameters = {
-                    "operation": "ping"
-                }
-        
-        if operation:
-            print(f"Arduino operation: {operation} with parameters: {parameters}")
-            # Execute Arduino control using tool registry
-            if self.tool_registry:
-                try:
-                    # Get the Arduino Bluetooth tool
-                    arduino_tool = self.tool_registry.get_tool("arduino_bluetooth_control")
-                    if arduino_tool:
-                        # Execute the operation asynchronously
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        try:
-                            result = loop.run_until_complete(arduino_tool.execute(parameters))
-                            print(f"Arduino control result: {result}")
-                            
-                            # Provide feedback via TTS
-                            if result.get('success'):
-                                if operation == "control_light":
-                                    light_id = parameters.get('light_id', 'light')
-                                    state = "on" if parameters.get('state') else "off"
-                                    self.speak_response(f"Turned {light_id} {state}")
-                                elif operation == "toggle_light":
-                                    light_id = parameters.get('light_id', 'light')
-                                    self.speak_response(f"Toggled {light_id}")
-                                elif operation == "control_all_lights":
-                                    state = "on" if parameters.get('state') else "off"
-                                    self.speak_response(f"Turned all lights {state}")
-                                elif operation == "get_status":
-                                    self.speak_response("Arduino status retrieved")
-                                elif operation == "ping":
-                                    self.speak_response("Arduino ping successful")
-                            else:
-                                self.speak_response("Arduino control failed")
-                        finally:
-                            loop.close()
-                    else:
-                        print("Arduino Bluetooth tool not found in registry")
-                        self.speak_response("Arduino control not available")
-                except Exception as e:
-                    print(f"Error executing Arduino control: {e}")
-                    self.speak_response(f"Arduino control error: {str(e)}")
-            else:
-                print("Tool registry not available")
-                self.speak_response("Arduino control not available")
-        else:
-            print("Could not determine Arduino operation type")
-            self.speak_response("Arduino command not recognized")
 
 
 class VoiceCommandProcessor:
@@ -1828,7 +879,7 @@ class VoiceCommandProcessor:
             self.background_thread.daemon = True
             self.background_thread.start()
             print("[MIC] Continuous listening active - speak anytime!")
-            print("[INFO] Available commands: 'home status', 'show chatbox', 'hide chatbox', etc.")
+            print("[INFO] Available commands: 'show chatbox', 'hide chatbox', 'control lights', 'check temperature', etc.")
     
     def stop_listening(self):
         """Stop listening for voice commands."""
@@ -1860,7 +911,7 @@ class VoiceCommandProcessor:
             return
         
         print(f"Voice recognition started. Energy threshold: {self.recognizer.energy_threshold}")
-        print("Available commands: 'home status', 'show system info', 'search for weather', etc.")
+        print("Available commands: 'control lights', 'check temperature', 'show system info', 'search for weather', etc.")
         print("Optimized for real-time performance like awsmarthome")
         
         # Optimize recognizer settings for speed
@@ -1943,7 +994,7 @@ class VoiceCommandProcessor:
                 # No sleep - continue immediately for real-time performance
     
     def process_audio_input(self, audio_data: bytes) -> bool:
-        """Process audio input and return True if home status was requested."""
+        """Process audio input and return True if command was processed."""
         if not self.voice_enabled or not self.recognizer:
             return False
         
@@ -1957,7 +1008,7 @@ class VoiceCommandProcessor:
             return False
     
     def process_text_input(self, text: str) -> bool:
-        """Process text input and return True if home status was requested."""
+        """Process text input and return True if command was processed."""
         return self.handler.process_text_command(text)
     
     def manual_trigger_listening(self):
@@ -1990,9 +1041,7 @@ class VoiceCommandProcessor:
         except Exception as e:
             print(f"Error: {e}")
     
-    def set_home_status_callback(self, callback: Callable):
-        """Set the callback for home status requests."""
-        self.handler.set_home_status_callback(callback)
+    # Removed set_home_status_callback - now handled by LLM tools
     
     def set_file_operation_callback(self, callback: Callable):
         """Set the callback for file operation requests."""
