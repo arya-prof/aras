@@ -6,12 +6,14 @@ import asyncio
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode
 import aiohttp
 import base64
 
 from .base import AsyncTool
+from ..config import settings
 from ..models import ToolCategory
 
 logger = logging.getLogger(__name__)
@@ -38,10 +40,10 @@ class SpotifyTool(AsyncTool):
         
     async def _setup_resources(self):
         """Setup HTTP session and load Spotify credentials."""
-        # Load Spotify credentials from environment or config
-        self.client_id = os.getenv('SPOTIFY_CLIENT_ID')
-        self.client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
-        self.redirect_uri = os.getenv('SPOTIFY_REDIRECT_URI', 'http://localhost:8080/callback')
+        # Load Spotify credentials from centralized config
+        self.client_id = settings.spotify_client_id
+        self.client_secret = settings.spotify_client_secret
+        self.redirect_uri = settings.spotify_redirect_uri
         
         if not self.client_id or not self.client_secret:
             logger.warning("Spotify credentials not found. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET environment variables.")
@@ -85,8 +87,20 @@ class SpotifyTool(AsyncTool):
     
     async def _load_tokens(self):
         """Load stored tokens from file."""
-        token_file = self.get_temp_dir() / "spotify_tokens.json"
-        if token_file.exists():
+        # Try multiple locations for tokens
+        token_locations = [
+            self.get_temp_dir() / "spotify_tokens.json" if self.get_temp_dir() else None,
+            Path("data") / "spotify_tokens.json",
+            Path("spotify_tokens.json")
+        ]
+        
+        token_file = None
+        for location in token_locations:
+            if location and location.exists():
+                token_file = location
+                break
+        
+        if token_file:
             try:
                 with open(token_file, 'r') as f:
                     tokens = json.load(f)
@@ -95,20 +109,28 @@ class SpotifyTool(AsyncTool):
                     self.token_expires_at = tokens.get('expires_at')
                     
                     # Check if token is still valid
-                    if self.token_expires_at and self.token_expires_at > asyncio.get_event_loop().time():
+                    import time
+                    current_time = time.time()
+                    if self.token_expires_at and self.token_expires_at > current_time:
                         logger.info("Loaded valid Spotify tokens")
                     else:
                         logger.info("Spotify tokens expired, need refresh")
                         await self._refresh_access_token()
             except Exception as e:
                 logger.warning(f"Failed to load Spotify tokens: {e}")
+        else:
+            logger.info("No Spotify tokens found in any location")
     
     async def _save_tokens(self):
         """Save tokens to file."""
         if not self.access_token:
             return
-            
-        token_file = self.get_temp_dir() / "spotify_tokens.json"
+        
+        # Save to data directory for persistence
+        data_dir = Path("data")
+        data_dir.mkdir(exist_ok=True)
+        token_file = data_dir / "spotify_tokens.json"
+        
         try:
             tokens = {
                 'access_token': self.access_token,
@@ -117,6 +139,7 @@ class SpotifyTool(AsyncTool):
             }
             with open(token_file, 'w') as f:
                 json.dump(tokens, f)
+            logger.info(f"Spotify tokens saved to {token_file}")
         except Exception as e:
             logger.warning(f"Failed to save Spotify tokens: {e}")
     
@@ -126,7 +149,8 @@ class SpotifyTool(AsyncTool):
             raise RuntimeError("No access token available. Please authenticate first.")
         
         # Check if token needs refresh
-        if self.token_expires_at and self.token_expires_at <= asyncio.get_event_loop().time():
+        import time
+        if self.token_expires_at and self.token_expires_at <= time.time():
             await self._refresh_access_token()
         
         return {
@@ -162,7 +186,8 @@ class SpotifyTool(AsyncTool):
                 if response.status == 200:
                     token_data = await response.json()
                     self.access_token = token_data['access_token']
-                    self.token_expires_at = asyncio.get_event_loop().time() + token_data['expires_in']
+                    import time
+                    self.token_expires_at = time.time() + token_data['expires_in']
                     
                     if 'refresh_token' in token_data:
                         self.refresh_token = token_data['refresh_token']
@@ -289,7 +314,8 @@ class SpotifyTool(AsyncTool):
                     token_data = await response.json()
                     self.access_token = token_data['access_token']
                     self.refresh_token = token_data['refresh_token']
-                    self.token_expires_at = asyncio.get_event_loop().time() + token_data['expires_in']
+                    import time
+                    self.token_expires_at = time.time() + token_data['expires_in']
                     
                     await self._save_tokens()
                     return {"success": True, "message": "Successfully authenticated with Spotify"}

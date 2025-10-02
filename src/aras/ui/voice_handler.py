@@ -514,8 +514,15 @@ class VoiceCommandHandler(QObject):
                     try:
                         new_loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(new_loop)
-                        result_container[0] = new_loop.run_until_complete(tool.execute(tool_call.parameters))
-                        new_loop.close()
+                        try:
+                            result_container[0] = new_loop.run_until_complete(tool.execute(tool_call.parameters))
+                        finally:
+                            # Clean up the tool properly
+                            try:
+                                new_loop.run_until_complete(tool.cleanup())
+                            except:
+                                pass
+                            new_loop.close()
                     except Exception as e:
                         exception_container[0] = e
                 
@@ -544,6 +551,11 @@ class VoiceCommandHandler(QObject):
                 try:
                     result = loop.run_until_complete(tool.execute(tool_call.parameters))
                 finally:
+                    # Clean up the tool properly
+                    try:
+                        loop.run_until_complete(tool.cleanup())
+                    except:
+                        pass
                     loop.close()
             
             execution_time = (datetime.now() - start_time).total_seconds()

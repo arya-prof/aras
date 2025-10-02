@@ -14,7 +14,7 @@ from .knowledge_tools import MemoryOperationsTool, VectorSearchTool
 from .voice_vision_tools import SpeechProcessingTool, ImageProcessingTool, CameraControlTool
 from .safety_tools import PermissionCheckTool, AccessControlTool, AuditLoggingTool
 from .arduino_bluetooth_tool import ArduinoBluetoothTool
-from .spotify_tool import SpotifyTool
+from .spotify_sync_tool import SpotifySyncTool
 
 
 def create_tool_registry() -> ToolRegistry:
@@ -61,6 +61,6 @@ def create_tool_registry() -> ToolRegistry:
     registry.register_tool(ArduinoBluetoothTool())
     
     # Music tools
-    registry.register_tool(SpotifyTool())
+    registry.register_tool(SpotifySyncTool())
     
     return registry
