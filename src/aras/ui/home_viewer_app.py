@@ -8,8 +8,8 @@ import logging
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QStatusBar, QPushButton, QGridLayout, QSizePolicy, QTabWidget,
                             QDialog, QCheckBox, QSpinBox, QComboBox, QGroupBox)
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QPoint
+from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QFont
 
 try:
     from .home_3d_viewer import Home3DViewer
@@ -203,11 +203,13 @@ class HomeViewerApp(QMainWindow):
     
     def init_ui(self):
         """Initialize the user interface."""
-        # Central widget
+        # Central widget with futuristic dark theme
         central_widget = QWidget()
         central_widget.setStyleSheet("""
             QWidget {
-                background-color: transparent;
+                background-color: #1A1A1A;
+                color: #E0E0E0;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
         """)
         self.setCentralWidget(central_widget)
@@ -215,37 +217,43 @@ class HomeViewerApp(QMainWindow):
         # Main layout - horizontal split
         main_layout = QHBoxLayout(central_widget)
         
-        # Left side - Viewer (50% of width)
+        # Left side - Controls (50% of width)
         left_panel = QWidget()
         left_panel.setStyleSheet("""
             QWidget {
-                background-color: transparent;
+                background-color: rgba(30, 30, 30, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
+                margin: 5px;
             }
         """)
         left_layout = QVBoxLayout(left_panel)
-        
-        # Create view switcher
-        self.create_view_switcher(left_layout)
-        
-        # Create stacked widget for views
-        self.stacked_widget = QWidget()
-        self.stacked_layout = QHBoxLayout(self.stacked_widget)
-        left_layout.addWidget(self.stacked_widget, 1)  # Add stretch factor to fill space
-        
-        # Right side - Controls (50% of width)
-        right_panel = QWidget()
-        right_panel.setStyleSheet("""
-            QWidget {
-                background-color: transparent;
-            }
-        """)
-        right_layout = QVBoxLayout(right_panel)
         
         # Initialize device controls
         self.initialize_device_controls()
         
         # Create tabbed interface
-        self.create_tabbed_interface(right_layout)
+        self.create_tabbed_interface(left_layout)
+        
+        # Right side - Viewer (50% of width)
+        right_panel = QWidget()
+        right_panel.setStyleSheet("""
+            QWidget {
+                background-color: rgba(30, 30, 30, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
+                margin: 5px;
+            }
+        """)
+        right_layout = QVBoxLayout(right_panel)
+        
+        # Create view switcher
+        self.create_view_switcher(right_layout)
+        
+        # Create stacked widget for views
+        self.stacked_widget = QWidget()
+        self.stacked_layout = QHBoxLayout(self.stacked_widget)
+        right_layout.addWidget(self.stacked_widget, 1)  # Add stretch factor to fill space
         
         # Add panels to main layout with equal stretch
         main_layout.addWidget(left_panel, 1)  # 50% width
@@ -301,29 +309,94 @@ class HomeViewerApp(QMainWindow):
         """Create the view switcher (status only)."""
         switcher_layout = QHBoxLayout()
         
-        # Status display
-        self.view_status = QLabel("3D View")
-        self.view_status.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50; padding: 10px;")
-        switcher_layout.addWidget(self.view_status)
+        # Header bar with futuristic styling
+        header_widget = QWidget()
+        header_widget.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 0px;
+                padding: 8px;
+            }
+        """)
+        header_layout = QHBoxLayout(header_widget)
         
-        switcher_layout.addStretch()
-        
-        # Instructions
-        instructions = QLabel("Press 3 for 3D, 2 for 2D, R to reset, ESC to close")
-        instructions.setStyleSheet("font-size: 12px; color: gray; padding: 10px;")
-        switcher_layout.addWidget(instructions)
-        
-        # Settings button
-        self.settings_button = QPushButton("⚙")
-        self.settings_button.setStyleSheet("""
+        # Back button (left arrow)
+        back_btn = QPushButton("<<")
+        back_btn.setStyleSheet("""
             QPushButton {
                 background: transparent;
-                color: #ffffff;
+                color: #E0E0E0;
                 font-weight: bold;
-                font-size: 18px;
+                font-size: 16px;
+                padding: 4px 8px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 0px;
+                min-width: 30px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #4CAF50;
+            }
+        """)
+        header_layout.addWidget(back_btn)
+        
+        # Title and status
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(2)
+        
+        # Main title
+        self.view_status = QLabel("AGENT DATA OVERVIEW")
+        self.view_status.setStyleSheet("""
+            font-size: 20px;
+            font-weight: bold;
+            color: #E0E0E0;
+            padding: 0px;
+            text-align: center;
+        """)
+        title_layout.addWidget(self.view_status)
+        
+        # Last update timestamp
+        self.last_update = QLabel("Last Update 05/06/2025 20:00")
+        self.last_update.setStyleSheet("""
+            font-size: 12px;
+            color: #888888;
+            padding: 0px;
+            text-align: center;
+        """)
+        title_layout.addWidget(self.last_update)
+        
+        header_layout.addLayout(title_layout)
+        header_layout.addStretch()
+        
+        # User initials and controls
+        user_controls_layout = QHBoxLayout()
+        user_controls_layout.setSpacing(8)
+        
+        # User initials
+        user_initials = QLabel("JM SW RW")
+        user_initials.setStyleSheet("""
+            font-size: 12px;
+            color: #E0E0E0;
+            font-weight: bold;
+            padding: 4px 8px;
+            background-color: rgba(60, 60, 60, 0.7);
+            border-radius: 0px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        """)
+        user_controls_layout.addWidget(user_initials)
+        
+        # Control buttons
+        refresh_btn = QPushButton("↻")
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #E0E0E0;
+                font-weight: bold;
+                font-size: 14px;
                 padding: 4px;
-                border: none;
-                border-radius: 3px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 0px;
                 min-width: 24px;
                 min-height: 24px;
             }
@@ -331,64 +404,321 @@ class HomeViewerApp(QMainWindow):
                 background: rgba(255, 255, 255, 0.1);
                 color: #4CAF50;
             }
-            QPushButton:pressed {
-                background: rgba(255, 255, 255, 0.2);
-                color: #66BB6A;
+        """)
+        user_controls_layout.addWidget(refresh_btn)
+        
+        export_btn = QPushButton("⊞")
+        export_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #E0E0E0;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 4px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 0px;
+                min-width: 24px;
+                min-height: 24px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #4CAF50;
+            }
+        """)
+        user_controls_layout.addWidget(export_btn)
+        
+        # Settings button
+        self.settings_button = QPushButton("⋮")
+        self.settings_button.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #E0E0E0;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 4px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 0px;
+                min-width: 24px;
+                min-height: 24px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #4CAF50;
             }
         """)
         self.settings_button.setToolTip("Settings")
         self.settings_button.clicked.connect(self.open_settings)
-        switcher_layout.addWidget(self.settings_button)
+        user_controls_layout.addWidget(self.settings_button)
         
+        header_layout.addLayout(user_controls_layout)
+        
+        switcher_layout.addWidget(header_widget)
         parent_layout.addLayout(switcher_layout)
     
+    def create_tab_icon(self, icon_type, size=32):
+        """Create an icon for a tab based on the icon type."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Set colors
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(Qt.BrushStyle.SolidPattern)
+        
+        if icon_type == "overview":
+            # Grid of 9 squares (3x3) - waffle icon
+            painter.setBrush(Qt.GlobalColor.white)
+            square_size = 6
+            spacing = 2
+            start_x = (size - (3 * square_size + 2 * spacing)) // 2
+            start_y = (size - (3 * square_size + 2 * spacing)) // 2
+            
+            for row in range(3):
+                for col in range(3):
+                    x = start_x + col * (square_size + spacing)
+                    y = start_y + row * (square_size + spacing)
+                    painter.drawRect(x, y, square_size, square_size)
+                    
+        elif icon_type == "bedroom":
+            # Diamond with dot in center
+            painter.setBrush(Qt.GlobalColor.white)
+            center_x, center_y = size // 2, size // 2
+            diamond_size = 12
+            
+            # Draw diamond
+            points = [
+                QPoint(center_x, center_y - diamond_size),  # Top
+                QPoint(center_x + diamond_size, center_y),  # Right
+                QPoint(center_x, center_y + diamond_size),  # Bottom
+                QPoint(center_x - diamond_size, center_y)   # Left
+            ]
+            painter.drawPolygon(points)
+            
+            # Draw center dot
+            painter.setBrush(Qt.GlobalColor.darkGray)
+            painter.drawEllipse(center_x - 2, center_y - 2, 4, 4)
+            
+        elif icon_type == "living":
+            # Square with horizontal line through middle
+            painter.setBrush(Qt.GlobalColor.white)
+            square_size = 16
+            x = (size - square_size) // 2
+            y = (size - square_size) // 2
+            painter.drawRect(x, y, square_size, square_size)
+            
+            # Draw horizontal line
+            painter.setBrush(Qt.GlobalColor.darkGray)
+            center_x, center_y = size // 2, size // 2
+            line_y = center_y
+            painter.drawRect(x + 2, line_y - 1, square_size - 4, 2)
+            
+        elif icon_type == "kitchen":
+            # Starburst/asterisk symbol
+            painter.setBrush(Qt.GlobalColor.white)
+            center_x, center_y = size // 2, size // 2
+            radius = 10
+            
+            # Draw starburst
+            for i in range(8):
+                angle = i * 45
+                import math
+                x1 = center_x + radius * math.cos(math.radians(angle))
+                y1 = center_y + radius * math.sin(math.radians(angle))
+                x2 = center_x + (radius * 0.5) * math.cos(math.radians(angle))
+                y2 = center_y + (radius * 0.5) * math.sin(math.radians(angle))
+                painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+            
+        elif icon_type == "bathroom":
+            # Circle with 'i' inside
+            painter.setBrush(Qt.GlobalColor.white)
+            center_x, center_y = size // 2, size // 2
+            radius = 10
+            painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+            
+            # Draw 'i'
+            painter.setBrush(Qt.GlobalColor.darkGray)
+            painter.drawRect(center_x - 1, center_y - 6, 2, 2)  # Dot
+            painter.drawRect(center_x - 1, center_y - 2, 2, 6)  # Line
+            
+        elif icon_type == "outside":
+            # Gear icon
+            painter.setBrush(Qt.GlobalColor.white)
+            center_x, center_y = size // 2, size // 2
+            outer_radius = 10
+            inner_radius = 6
+            
+            # Draw gear teeth
+            for i in range(8):
+                angle = i * 45
+                import math
+                x1 = center_x + outer_radius * math.cos(math.radians(angle))
+                y1 = center_y + outer_radius * math.sin(math.radians(angle))
+                x2 = center_x + (outer_radius * 0.7) * math.cos(math.radians(angle))
+                y2 = center_y + (outer_radius * 0.7) * math.sin(math.radians(angle))
+                painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+            
+            # Draw center circle
+            painter.drawEllipse(center_x - inner_radius, center_y - inner_radius, inner_radius * 2, inner_radius * 2)
+            
+        elif icon_type == "security":
+            # Camera/eye icon
+            painter.setBrush(Qt.GlobalColor.white)
+            center_x, center_y = size // 2, size // 2
+            
+            # Draw camera body
+            painter.drawRect(center_x - 8, center_y - 4, 16, 8)
+            
+            # Draw lens
+            painter.setBrush(Qt.GlobalColor.darkGray)
+            painter.drawEllipse(center_x - 3, center_y - 3, 6, 6)
+            
+        painter.end()
+        return QIcon(pixmap)
+
     def create_tabbed_interface(self, parent_layout):
         """Create the tabbed interface organized by rooms."""
-        # Create tab widget
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setStyleSheet("""
-            QTabWidget::pane {
-                border: none;
+        # Create main container for vertical layout
+        main_container = QWidget()
+        main_container.setStyleSheet("""
+            QWidget {
                 background-color: transparent;
             }
-            QTabBar::tab {
-                background-color: rgba(60, 60, 60, 0.7);
-                color: #cccccc;
-                padding: 4px 8px;
-                margin-right: 1px;
-                border-top-left-radius: 3px;
-                border-top-right-radius: 3px;
-                min-width: 60px;
-                font-size: 11px;
-                font-weight: normal;
+        """)
+        main_layout = QHBoxLayout(main_container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # Create vertical tab bar
+        self.tab_bar = QWidget()
+        self.tab_bar.setFixedWidth(80)  # Reduced width for icon-only tabs
+        self.tab_bar.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 0.9);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            QTabBar::tab:selected {
-                background-color: rgba(100, 100, 100, 0.8);
-                color: #ffffff;
-                font-weight: bold;
-                border: 1px solid rgba(150, 150, 150, 0.6);
-            }
-            QTabBar::tab:hover {
-                background-color: rgba(74, 74, 74, 0.8);
-                color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            }
-            QTabBar::tab:!selected {
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
+                margin-right: 5px;
             }
         """)
+        tab_bar_layout = QVBoxLayout(self.tab_bar)
+        tab_bar_layout.setContentsMargins(4, 4, 4, 4)
+        tab_bar_layout.setSpacing(2)
         
-        # Create room-based tabs - Updated for Arduino devices
+        # Create tab buttons
+        self.tab_buttons = []
+        self.tab_pages = {}
+        
+        # Tab definitions with icon types
+        tabs = [
+            ("Overview", "overview", "overview"),
+            ("Bedroom 1", "bedroom1", "bedroom"),
+            ("Living Room", "livingroom", "living"),
+            ("Kitchen", "kitchen", "kitchen"),
+            ("Bathroom", "bathroom", "bathroom"),
+            ("Outside", "outside", "outside"),
+            ("Security", "security", "security")
+        ]
+        
+        for i, (tab_name, tab_id, icon_type) in enumerate(tabs):
+            btn = QPushButton()
+            btn.setCheckable(True)
+            btn.setFixedSize(60, 60)  # Square buttons for icons
+            btn.setIcon(self.create_tab_icon(icon_type, 32))
+            btn.setIconSize(QSize(32, 32))
+            btn.setToolTip(tab_name)  # Show name on hover
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(50, 50, 50, 0.8);
+                    color: #E0E0E0;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 0px;
+                    padding: 4px;
+                }
+                QPushButton:checked {
+                    background-color: rgba(76, 175, 80, 0.8);
+                    color: #ffffff;
+                    border: 1px solid rgba(76, 175, 80, 0.6);
+                }
+                QPushButton:hover {
+                    background-color: rgba(60, 60, 60, 0.9);
+                    color: #ffffff;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                }
+                QPushButton:checked:hover {
+                    background-color: rgba(76, 175, 80, 0.9);
+                }
+            """)
+            btn.clicked.connect(lambda checked, idx=i: self.switch_tab(idx))
+            self.tab_buttons.append(btn)
+            tab_bar_layout.addWidget(btn)
+        
+        tab_bar_layout.addStretch()
+        main_layout.addWidget(self.tab_bar)
+        
+        # Create content area
+        self.content_area = QWidget()
+        self.content_area.setStyleSheet("""
+            QWidget {
+                background-color: rgba(30, 30, 30, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
+            }
+        """)
+        self.content_layout = QVBoxLayout(self.content_area)
+        self.content_layout.setContentsMargins(8, 8, 8, 8)
+        
+        # Create tab pages
         self.create_overview_tab()
-        self.create_room_tab("Bedroom 1", ["L1", "L2", "RING"])   # L1, L2, and RING (Arduino controlled)
-        self.create_room_tab("Living Room", [])                   # No Arduino devices
-        self.create_room_tab("Kitchen", [])                       # No Arduino devices
-        self.create_room_tab("Bathroom", [])                      # No Arduino devices
-        self.create_room_tab("Outside", [])                       # No Arduino devices
+        self.create_room_tab("Bedroom 1", ["L1", "L2", "RING"])
+        self.create_room_tab("Living Room", [])
+        self.create_room_tab("Kitchen", [])
+        self.create_room_tab("Bathroom", [])
+        self.create_room_tab("Outside", [])
         self.create_security_cameras_tab()
         
-        parent_layout.addWidget(self.tab_widget)
+        # Store tab pages
+        self.tab_pages = {
+            "overview": self.overview_tab,
+            "bedroom1": self.bedroom1_tab,
+            "livingroom": self.livingroom_tab,
+            "kitchen": self.kitchen_tab,
+            "bathroom": self.bathroom_tab,
+            "outside": self.outside_tab,
+            "security": self.security_tab
+        }
+        
+        # Show initial tab
+        self.current_tab_index = 0
+        self.tab_buttons[0].setChecked(True)
+        self.show_tab_content("overview")
+        
+        main_layout.addWidget(self.content_area, 1)
+        parent_layout.addWidget(main_container)
+    
+    def switch_tab(self, tab_index):
+        """Switch to a different tab."""
+        # Uncheck all buttons
+        for btn in self.tab_buttons:
+            btn.setChecked(False)
+        
+        # Check the selected button
+        self.tab_buttons[tab_index].setChecked(True)
+        self.current_tab_index = tab_index
+        
+        # Show corresponding content
+        tab_names = ["overview", "bedroom1", "livingroom", "kitchen", "bathroom", "outside", "security"]
+        self.show_tab_content(tab_names[tab_index])
+    
+    def show_tab_content(self, tab_name):
+        """Show the content for the specified tab."""
+        # Clear current content
+        for i in reversed(range(self.content_layout.count())):
+            self.content_layout.itemAt(i).widget().setParent(None)
+        
+        # Add the selected tab content
+        if tab_name in self.tab_pages:
+            self.content_layout.addWidget(self.tab_pages[tab_name])
     
     def create_overview_tab(self):
         """Create the overview tab with all devices and global controls."""
@@ -399,18 +729,194 @@ class HomeViewerApp(QMainWindow):
             }
         """)
         overview_layout = QVBoxLayout(overview_tab)
-        overview_layout.setContentsMargins(8, 8, 8, 8)
-        overview_layout.setSpacing(6)
+        overview_layout.setContentsMargins(12, 12, 12, 12)
+        overview_layout.setSpacing(8)
         
-        # Overview header
-        overview_header = QLabel("Home Overview")
+        # Overview header with futuristic styling
+        overview_header = QLabel("Agent Allocation")
         overview_header.setStyleSheet("""
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
-            color: #ffffff;
-            padding: 6px 0px;
+            color: #E0E0E0;
+            padding: 8px 0px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         """)
         overview_layout.addWidget(overview_header)
+        
+        # Agent statistics display
+        stats_widget = QWidget()
+        stats_widget.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
+                padding: 12px;
+            }
+        """)
+        stats_layout = QHBoxLayout(stats_widget)
+        
+        # Large numbers display
+        self.active_field_label = QLabel("190")
+        self.active_field_label.setStyleSheet("""
+            font-size: 32px;
+            font-weight: bold;
+            color: #4CAF50;
+            padding: 8px;
+            text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        stats_layout.addWidget(self.active_field_label)
+        
+        self.undercover_label = QLabel("990")
+        self.undercover_label.setStyleSheet("""
+            font-size: 32px;
+            font-weight: bold;
+            color: #2196F3;
+            padding: 8px;
+            text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        stats_layout.addWidget(self.undercover_label)
+        
+        self.training_label = QLabel("290")
+        self.training_label.setStyleSheet("""
+            font-size: 32px;
+            font-weight: bold;
+            color: #FF9800;
+            padding: 8px;
+            text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        stats_layout.addWidget(self.training_label)
+        
+        overview_layout.addWidget(stats_widget)
+        
+        # Labels for the numbers
+        labels_layout = QHBoxLayout()
+        labels_layout.addWidget(QLabel("Active Field.."))
+        labels_layout.addWidget(QLabel("Undercover.."))
+        labels_layout.addWidget(QLabel("Training.."))
+        for i in range(labels_layout.count()):
+            label = labels_layout.itemAt(i).widget()
+            label.setStyleSheet("""
+                font-size: 12px;
+                color: #888888;
+                text-align: center;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            """)
+        overview_layout.addLayout(labels_layout)
+        
+        # Mission Information section
+        mission_header = QLabel("Mission Information")
+        mission_header.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #E0E0E0;
+            padding: 15px 0px 8px 0px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        overview_layout.addWidget(mission_header)
+        
+        # Mission stats widget
+        mission_widget = QWidget()
+        mission_widget.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
+                padding: 12px;
+            }
+        """)
+        mission_layout = QVBoxLayout(mission_widget)
+        
+        # Successful missions
+        success_layout = QHBoxLayout()
+        success_icon = QLabel("►")
+        success_icon.setStyleSheet("""
+            font-size: 14px;
+            color: #4CAF50;
+            font-weight: bold;
+            padding: 4px;
+        """)
+        success_layout.addWidget(success_icon)
+        
+        success_label = QLabel("Successful Missions")
+        success_label.setStyleSheet("""
+            font-size: 14px;
+            color: #E0E0E0;
+            font-weight: bold;
+            padding: 4px;
+        """)
+        success_layout.addWidget(success_label)
+        success_layout.addStretch()
+        mission_layout.addLayout(success_layout)
+        
+        # Mission breakdown
+        mission_breakdown = QWidget()
+        breakdown_layout = QHBoxLayout(mission_breakdown)
+        
+        # High Risk
+        high_risk_layout = QVBoxLayout()
+        high_risk_label = QLabel("High Risk Mission")
+        high_risk_label.setStyleSheet("""
+            font-size: 12px;
+            color: #888888;
+            text-align: center;
+        """)
+        high_risk_number = QLabel("190")
+        high_risk_number.setStyleSheet("""
+            font-size: 24px;
+            font-weight: bold;
+            color: #E0E0E0;
+            text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        high_risk_layout.addWidget(high_risk_number)
+        high_risk_layout.addWidget(high_risk_label)
+        breakdown_layout.addLayout(high_risk_layout)
+        
+        # Medium Risk
+        medium_risk_layout = QVBoxLayout()
+        medium_risk_label = QLabel("Medium Risk Mission")
+        medium_risk_label.setStyleSheet("""
+            font-size: 12px;
+            color: #888888;
+            text-align: center;
+        """)
+        medium_risk_number = QLabel("426")
+        medium_risk_number.setStyleSheet("""
+            font-size: 24px;
+            font-weight: bold;
+            color: #E0E0E0;
+            text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        medium_risk_layout.addWidget(medium_risk_number)
+        medium_risk_layout.addWidget(medium_risk_label)
+        breakdown_layout.addLayout(medium_risk_layout)
+        
+        # Low Risk
+        low_risk_layout = QVBoxLayout()
+        low_risk_label = QLabel("Low Risk Mission")
+        low_risk_label.setStyleSheet("""
+            font-size: 12px;
+            color: #888888;
+            text-align: center;
+        """)
+        low_risk_number = QLabel("920")
+        low_risk_number.setStyleSheet("""
+            font-size: 24px;
+            font-weight: bold;
+            color: #E0E0E0;
+            text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        low_risk_layout.addWidget(low_risk_number)
+        low_risk_layout.addWidget(low_risk_label)
+        breakdown_layout.addLayout(low_risk_layout)
+        
+        mission_layout.addWidget(mission_breakdown)
+        overview_layout.addWidget(mission_widget)
         
         # Global controls
         global_controls_layout = QHBoxLayout()
@@ -433,8 +939,9 @@ class HomeViewerApp(QMainWindow):
         self.device_count_label = QLabel("0/3 devices ON")
         self.device_count_label.setStyleSheet("""
             font-size: 14px;
-            color: #cccccc;
+            color: #E0E0E0;
             padding: 5px 0px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         """)
         global_controls_layout.addWidget(self.device_count_label)
         
@@ -445,6 +952,7 @@ class HomeViewerApp(QMainWindow):
             color: #f44336;
             font-weight: bold;
             padding: 5px 0px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         """)
         global_controls_layout.addWidget(self.arduino_status_label)
         global_controls_layout.addStretch()
@@ -479,7 +987,8 @@ class HomeViewerApp(QMainWindow):
         overview_layout.addLayout(scene_grid)
         overview_layout.addStretch()
         
-        self.tab_widget.addTab(overview_tab, "Overview")
+        # Store reference for vertical tabs
+        self.overview_tab = overview_tab
     
     def create_room_tab(self, room_name, device_ids):
         """Create a tab for a specific room with its devices."""
@@ -581,7 +1090,18 @@ class HomeViewerApp(QMainWindow):
             room_layout.addWidget(no_devices_label)
         
         room_layout.addStretch()
-        self.tab_widget.addTab(room_tab, room_name)
+        
+        # Store reference for vertical tabs based on room name
+        if room_name == "Bedroom 1":
+            self.bedroom1_tab = room_tab
+        elif room_name == "Living Room":
+            self.livingroom_tab = room_tab
+        elif room_name == "Kitchen":
+            self.kitchen_tab = room_tab
+        elif room_name == "Bathroom":
+            self.bathroom_tab = room_tab
+        elif room_name == "Outside":
+            self.outside_tab = room_tab
     
     def create_security_cameras_tab(self):
         """Create the security cameras tab with camera controls."""
@@ -610,7 +1130,7 @@ class HomeViewerApp(QMainWindow):
         status_group.setStyleSheet("""
             QWidget {
                 background-color: rgba(60, 60, 60, 0.3);
-                border-radius: 8px;
+                border-radius: 0px;
                 padding: 10px;
                 border: 1px solid rgba(255, 255, 255, 0.1);
             }
@@ -728,7 +1248,8 @@ class HomeViewerApp(QMainWindow):
         cameras_layout.addLayout(cameras_list_layout)
         cameras_layout.addStretch()
         
-        self.tab_widget.addTab(cameras_tab, "Security")
+        # Store reference for vertical tabs
+        self.security_tab = cameras_tab
     
     def get_camera_button_style(self, is_on):
         """Get the style for camera on/off buttons."""
@@ -741,7 +1262,7 @@ class HomeViewerApp(QMainWindow):
                     font-weight: bold;
                     font-size: 10px;
                     border: 2px solid #888888;
-                    border-radius: 6px;
+                    border-radius: 0px;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -762,7 +1283,7 @@ class HomeViewerApp(QMainWindow):
                     font-weight: bold;
                     font-size: 10px;
                     border: 2px solid #666666;
-                    border-radius: 6px;
+                    border-radius: 0px;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -787,7 +1308,7 @@ class HomeViewerApp(QMainWindow):
                     font-weight: bold;
                     font-size: 10px;
                     border: 2px solid #cc4444;
-                    border-radius: 6px;
+                    border-radius: 0px;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -808,7 +1329,7 @@ class HomeViewerApp(QMainWindow):
                     font-weight: bold;
                     font-size: 10px;
                     border: 2px solid #666666;
-                    border-radius: 6px;
+                    border-radius: 0px;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -904,22 +1425,24 @@ class HomeViewerApp(QMainWindow):
         return """
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #555555, stop:1 #444444);
-                color: #ffffff;
+                    stop:0 #404040, stop:1 #2a2a2a);
+                color: #E0E0E0;
                 font-weight: bold;
                 font-size: 12px;
                 padding: 8px 16px;
-                border: 1px solid #666666;
-                border-radius: 4px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 0px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #666666, stop:1 #555555);
-                border: 1px solid #777777;
+                    stop:0 #4CAF50, stop:1 #45a049);
+                border: 1px solid rgba(76, 175, 80, 0.6);
+                color: #ffffff;
             }
             QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #444444, stop:1 #333333);
+                    stop:0 #3d8b40, stop:1 #357a38);
             }
         """
     
@@ -997,43 +1520,45 @@ class HomeViewerApp(QMainWindow):
             return """
                 QPushButton {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #888888, stop:1 #666666);
-                    color: white;
+                        stop:0 #4CAF50, stop:1 #45a049);
+                    color: #ffffff;
                     font-weight: bold;
                     font-size: 10px;
-                    border: 2px solid #888888;
-                    border-radius: 8px;
+                    border: 2px solid #4CAF50;
+                    border-radius: 0px;
+                    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #999999, stop:1 #777777);
-                    border: 2px solid #999999;
+                        stop:0 #5CBF60, stop:1 #55b059);
+                    border: 2px solid #5CBF60;
                 }
                 QPushButton:pressed {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #777777, stop:1 #555555);
+                        stop:0 #3d8b40, stop:1 #357a38);
                 }
             """
         else:
             return """
                 QPushButton {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #666666, stop:1 #444444);
-                    color: #cccccc;
+                        stop:0 #404040, stop:1 #2a2a2a);
+                    color: #888888;
                     font-weight: bold;
                     font-size: 10px;
-                    border: 2px solid #666666;
-                    border-radius: 8px;
+                    border: 2px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 0px;
+                    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #777777, stop:1 #555555);
-                    color: #dddddd;
-                    border: 2px solid #777777;
+                        stop:0 #505050, stop:1 #3a3a3a);
+                    color: #E0E0E0;
+                    border: 2px solid rgba(255, 255, 255, 0.4);
                 }
                 QPushButton:pressed {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #555555, stop:1 #333333);
+                        stop:0 #303030, stop:1 #1a1a1a);
                 }
             """
     
@@ -1071,10 +1596,17 @@ class HomeViewerApp(QMainWindow):
         self.panel_3d.setVisible(True)
         self.panel_2d.setVisible(False)
         if hasattr(self, 'view_status'):
-            self.view_status.setText("3D View")
-            self.view_status.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50; padding: 10px;")
+            self.view_status.setText("AGENT DATA OVERVIEW")
+            self.view_status.setStyleSheet("""
+                font-size: 20px;
+                font-weight: bold;
+                color: #E0E0E0;
+                padding: 0px;
+                text-align: center;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            """)
         if hasattr(self, 'status_label'):
-            self.status_label.setText("3D View - Drag to rotate, wheel to zoom")
+            self.status_label.setText("3D VIEW - DRAG TO ROTATE, WHEEL TO ZOOM")
     
     def show_2d_view(self):
         """Show the 2D view."""
@@ -1082,10 +1614,17 @@ class HomeViewerApp(QMainWindow):
         self.panel_3d.setVisible(False)
         self.panel_2d.setVisible(True)
         if hasattr(self, 'view_status'):
-            self.view_status.setText("2D View")
-            self.view_status.setStyleSheet("font-size: 18px; font-weight: bold; color: #2196F3; padding: 10px;")
+            self.view_status.setText("AGENT DATA OVERVIEW")
+            self.view_status.setStyleSheet("""
+                font-size: 20px;
+                font-weight: bold;
+                color: #E0E0E0;
+                padding: 0px;
+                text-align: center;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            """)
         if hasattr(self, 'status_label'):
-            self.status_label.setText("2D View - Click rooms, wheel to zoom")
+            self.status_label.setText("2D VIEW - CLICK ROOMS, WHEEL TO ZOOM")
     
     
     def setup_connections(self):
@@ -1099,13 +1638,54 @@ class HomeViewerApp(QMainWindow):
     
     
     def setup_status_bar(self):
-        """Setup simple status bar."""
+        """Setup futuristic status bar."""
         self.status_bar = QStatusBar()
+        self.status_bar.setStyleSheet("""
+            QStatusBar {
+                background-color: rgba(30, 30, 30, 0.9);
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                color: #E0E0E0;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                font-size: 12px;
+                padding: 4px;
+            }
+        """)
         self.setStatusBar(self.status_bar)
         
-        # Simple status label
-        self.status_label = QLabel("Ready")
+        # Status label with futuristic styling
+        self.status_label = QLabel("SYSTEM READY")
+        self.status_label.setStyleSheet("""
+            font-size: 12px;
+            color: #4CAF50;
+            font-weight: bold;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
         self.status_bar.addWidget(self.status_label)
+        
+        # Add system status indicators
+        self.status_bar.addPermanentWidget(QLabel("|"))
+        
+        # Connection status
+        self.connection_status = QLabel("CONN: ONLINE")
+        self.connection_status.setStyleSheet("""
+            font-size: 11px;
+            color: #4CAF50;
+            font-weight: bold;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        self.status_bar.addPermanentWidget(self.connection_status)
+        
+        self.status_bar.addPermanentWidget(QLabel("|"))
+        
+        # Time display
+        self.time_display = QLabel("20:00:00")
+        self.time_display.setStyleSheet("""
+            font-size: 11px;
+            color: #E0E0E0;
+            font-weight: bold;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        self.status_bar.addPermanentWidget(self.time_display)
     
     
     def setup_shortcuts(self):
@@ -1154,9 +1734,9 @@ class HomeViewerApp(QMainWindow):
     def on_model_loaded(self):
         """Called when model loading is complete."""
         if self.current_view == "3d":
-            self.status_label.setText("3D View - Drag to rotate, wheel to zoom")
+            self.status_label.setText("3D VIEW - DRAG TO ROTATE, WHEEL TO ZOOM")
         else:
-            self.status_label.setText("2D View - Click rooms, wheel to zoom")
+            self.status_label.setText("2D VIEW - CLICK ROOMS, WHEEL TO ZOOM")
     
     
     def on_3d_view_changed(self, x, y, z):
@@ -1173,9 +1753,9 @@ class HomeViewerApp(QMainWindow):
         """Handle room selection."""
         self.current_room = room_name
         if self.current_view == "2d":
-            self.status_label.setText(f"2D View - Selected room: {room_name}")
+            self.status_label.setText(f"2D VIEW - SELECTED ROOM: {room_name.upper()}")
         else:
-            self.status_label.setText(f"3D View - Selected room: {room_name}")
+            self.status_label.setText(f"3D VIEW - SELECTED ROOM: {room_name.upper()}")
     
     
     def reset_all_views(self):
@@ -1183,13 +1763,13 @@ class HomeViewerApp(QMainWindow):
         self.viewer_3d.reset_view()
         self.viewer_2d.reset_view()
         if hasattr(self, 'status_label'):
-            self.status_label.setText("Views reset")
+            self.status_label.setText("VIEWS RESET")
     
     def toggle_sync(self):
         """Toggle synchronization."""
         self.sync_views = not self.sync_views
         if hasattr(self, 'status_label'):
-            self.status_label.setText(f"View sync: {'ON' if self.sync_views else 'OFF'}")
+            self.status_label.setText(f"VIEW SYNC: {'ON' if self.sync_views else 'OFF'}")
     
     def toggle_light(self, device_id):
         """Toggle a specific light on/off."""
@@ -1532,7 +2112,7 @@ class SettingsDialog(QDialog):
                 font-weight: bold;
                 color: #cccccc;
                 border: 2px solid #666666;
-                border-radius: 8px;
+                border-radius: 0px;
                 margin-top: 10px;
                 padding-top: 10px;
             }
@@ -1570,7 +2150,7 @@ class SettingsDialog(QDialog):
                 background-color: #444444;
                 color: #ffffff;
                 border: 1px solid #666666;
-                border-radius: 4px;
+                border-radius: 0px;
                 padding: 5px;
                 min-width: 100px;
             }
@@ -1598,7 +2178,7 @@ class SettingsDialog(QDialog):
                 font-weight: bold;
                 color: #cccccc;
                 border: 2px solid #666666;
-                border-radius: 8px;
+                border-radius: 0px;
                 margin-top: 10px;
                 padding-top: 10px;
             }
@@ -1621,7 +2201,7 @@ class SettingsDialog(QDialog):
                 background-color: #444444;
                 color: #ffffff;
                 border: 1px solid #666666;
-                border-radius: 4px;
+                border-radius: 0px;
                 padding: 5px;
                 min-width: 80px;
             }
@@ -1636,7 +2216,7 @@ class SettingsDialog(QDialog):
                 background-color: #444444;
                 color: #ffffff;
                 border: 1px solid #666666;
-                border-radius: 4px;
+                border-radius: 0px;
                 padding: 5px;
                 min-width: 80px;
             }
@@ -1662,7 +2242,7 @@ class SettingsDialog(QDialog):
                 font-size: 14px;
                 padding: 8px 20px;
                 border: none;
-                border-radius: 6px;
+                border-radius: 0px;
                 min-width: 80px;
             }
             QPushButton:hover {
@@ -1688,7 +2268,7 @@ class SettingsDialog(QDialog):
                 font-size: 14px;
                 padding: 8px 20px;
                 border: 1px solid #777777;
-                border-radius: 6px;
+                border-radius: 0px;
                 min-width: 80px;
             }
             QPushButton:hover {
