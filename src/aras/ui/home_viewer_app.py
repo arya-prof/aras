@@ -339,8 +339,8 @@ class HomeViewerApp(QMainWindow):
         header_widget = QWidget()
         header_widget.setStyleSheet("""
             QWidget {
-                background-color: rgba(0, 0, 0, 0.5);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                background-color: rgba(50, 50, 50, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
                 padding: 8px;
             }
@@ -351,18 +351,23 @@ class HomeViewerApp(QMainWindow):
         back_btn = QPushButton("<<")
         back_btn.setStyleSheet("""
             QPushButton {
-                background: transparent;
+                background-color: rgba(50, 50, 50, 0.8);
                 color: #E0E0E0;
                 font-weight: bold;
                 font-size: 16px;
                 padding: 4px 8px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
                 min-width: 30px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
             QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: #f44336;
+                background-color: rgba(244, 67, 54, 0.8);
+                color: #ffffff;
+                border: 1px solid rgba(244, 67, 54, 0.6);
+            }
+            QPushButton:pressed {
+                background-color: rgba(244, 67, 54, 0.9);
             }
         """)
         header_layout.addWidget(back_btn)
@@ -377,8 +382,12 @@ class HomeViewerApp(QMainWindow):
             font-size: 20px;
             font-weight: bold;
             color: #E0E0E0;
-            padding: 0px;
+            padding: 8px 12px;
             text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(50, 50, 50, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0px;
         """)
         title_layout.addWidget(self.view_status)
         
@@ -387,8 +396,12 @@ class HomeViewerApp(QMainWindow):
         self.last_update.setStyleSheet("""
             font-size: 12px;
             color: #888888;
-            padding: 0px;
+            padding: 4px 12px;
             text-align: center;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(30, 30, 30, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 0px;
         """)
         title_layout.addWidget(self.last_update)
         
@@ -405,10 +418,11 @@ class HomeViewerApp(QMainWindow):
             font-size: 12px;
             color: #E0E0E0;
             font-weight: bold;
-            padding: 4px 8px;
-            background-color: rgba(60, 60, 60, 0.7);
+            padding: 6px 12px;
+            background-color: rgba(50, 50, 50, 0.8);
             border-radius: 0px;
-            border: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         """)
         user_controls_layout.addWidget(user_initials)
         
@@ -416,19 +430,24 @@ class HomeViewerApp(QMainWindow):
         refresh_btn = QPushButton("↻")
         refresh_btn.setStyleSheet("""
             QPushButton {
-                background: transparent;
+                background-color: rgba(50, 50, 50, 0.8);
                 color: #E0E0E0;
                 font-weight: bold;
                 font-size: 14px;
                 padding: 4px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
                 min-width: 24px;
                 min-height: 24px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
             QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: #f44336;
+                background-color: rgba(244, 67, 54, 0.8);
+                color: #ffffff;
+                border: 1px solid rgba(244, 67, 54, 0.6);
+            }
+            QPushButton:pressed {
+                background-color: rgba(244, 67, 54, 0.9);
             }
         """)
         user_controls_layout.addWidget(refresh_btn)
@@ -436,19 +455,24 @@ class HomeViewerApp(QMainWindow):
         export_btn = QPushButton("⊞")
         export_btn.setStyleSheet("""
             QPushButton {
-                background: transparent;
+                background-color: rgba(50, 50, 50, 0.8);
                 color: #E0E0E0;
                 font-weight: bold;
                 font-size: 14px;
                 padding: 4px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
                 min-width: 24px;
                 min-height: 24px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
             QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: #f44336;
+                background-color: rgba(244, 67, 54, 0.8);
+                color: #ffffff;
+                border: 1px solid rgba(244, 67, 54, 0.6);
+            }
+            QPushButton:pressed {
+                background-color: rgba(244, 67, 54, 0.9);
             }
         """)
         user_controls_layout.addWidget(export_btn)
@@ -757,6 +781,10 @@ class HomeViewerApp(QMainWindow):
             color: #E0E0E0;
             padding: 8px 0px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(50, 50, 50, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0px;
+            padding: 8px 12px;
         """)
         overview_layout.addWidget(overview_header)
         
@@ -796,8 +824,12 @@ class HomeViewerApp(QMainWindow):
         scenes_header.setStyleSheet("""
             font-size: 14px;
             font-weight: bold;
-            color: #ffffff;
-            padding: 10px 0px 4px 0px;
+            color: #E0E0E0;
+            padding: 8px 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(50, 50, 50, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0px;
         """)
         overview_layout.addWidget(scenes_header)
         
@@ -839,8 +871,12 @@ class HomeViewerApp(QMainWindow):
         room_header.setStyleSheet("""
             font-size: 16px;
             font-weight: bold;
-            color: #ffffff;
-            padding: 6px 0px;
+            color: #E0E0E0;
+            padding: 6px 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(50, 50, 50, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0px;
         """)
         room_layout.addWidget(room_header)
         
@@ -884,8 +920,12 @@ class HomeViewerApp(QMainWindow):
             devices_header.setStyleSheet("""
                 font-size: 12px;
                 font-weight: bold;
-                color: #ffffff;
-                padding: 10px 0px 4px 0px;
+                color: #E0E0E0;
+                padding: 6px 12px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                background-color: rgba(50, 50, 50, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
             """)
             room_layout.addWidget(devices_header)
             
@@ -952,8 +992,12 @@ class HomeViewerApp(QMainWindow):
         cameras_header.setStyleSheet("""
             font-size: 16px;
             font-weight: bold;
-            color: #ffffff;
-            padding: 6px 0px;
+            color: #E0E0E0;
+            padding: 6px 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(50, 50, 50, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0px;
         """)
         cameras_layout.addWidget(cameras_header)
         
@@ -1002,8 +1046,12 @@ class HomeViewerApp(QMainWindow):
         controls_header.setStyleSheet("""
             font-size: 14px;
             font-weight: bold;
-            color: #ffffff;
-            padding: 15px 0px 5px 0px;
+            color: #E0E0E0;
+            padding: 8px 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(50, 50, 50, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0px;
         """)
         cameras_layout.addWidget(controls_header)
         
@@ -1495,7 +1543,14 @@ class HomeViewerApp(QMainWindow):
         self.status_bar.addWidget(self.status_label)
         
         # Add system status indicators
-        self.status_bar.addPermanentWidget(QLabel("|"))
+        separator = QLabel("|")
+        separator.setStyleSheet("""
+            font-size: 11px;
+            color: #666666;
+            font-weight: bold;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        self.status_bar.addPermanentWidget(separator)
         
         # Connection status
         self.connection_status = QLabel("CONN: ONLINE")
@@ -1507,7 +1562,14 @@ class HomeViewerApp(QMainWindow):
         """)
         self.status_bar.addPermanentWidget(self.connection_status)
         
-        self.status_bar.addPermanentWidget(QLabel("|"))
+        separator2 = QLabel("|")
+        separator2.setStyleSheet("""
+            font-size: 11px;
+            color: #666666;
+            font-weight: bold;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        self.status_bar.addPermanentWidget(separator2)
         
         # Arduino status
         self.arduino_status_label = QLabel("Arduino: Disconnected")
@@ -1519,7 +1581,14 @@ class HomeViewerApp(QMainWindow):
         """)
         self.status_bar.addPermanentWidget(self.arduino_status_label)
         
-        self.status_bar.addPermanentWidget(QLabel("|"))
+        separator3 = QLabel("|")
+        separator3.setStyleSheet("""
+            font-size: 11px;
+            color: #666666;
+            font-weight: bold;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        self.status_bar.addPermanentWidget(separator3)
         
         # Time display
         self.time_display = QLabel("20:00:00")
