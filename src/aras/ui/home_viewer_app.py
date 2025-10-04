@@ -207,7 +207,7 @@ class HomeViewerApp(QMainWindow):
         central_widget = QWidget()
         central_widget.setStyleSheet("""
             QWidget {
-                background-color: #1A1A1A;
+                background-color: #000000;
                 color: #E0E0E0;
                 font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             }
@@ -216,38 +216,38 @@ class HomeViewerApp(QMainWindow):
         
         # Main layout - horizontal split (tabs, controls, viewer)
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setSpacing(8)
         
         # Left section - Tabs (fixed width)
         tabs_section = QWidget()
-        tabs_section.setFixedWidth(60)  # Reduced width to fit smaller buttons
+        tabs_section.setFixedWidth(45)  # Further reduced width for more compact layout
         tabs_section.setStyleSheet("""
             QWidget {
-                background-color: rgba(40, 40, 40, 0.9);
+                background-color: transparent;
                 border: transparent;
                 border-radius: 0px;
                 margin: 0px;
             }
         """)
         tabs_layout = QVBoxLayout(tabs_section)
-        tabs_layout.setContentsMargins(0, 0, 0, 0)
-        tabs_layout.setSpacing(0)
+        tabs_layout.setContentsMargins(4, 4, 4, 4)
+        tabs_layout.setSpacing(4)
         
         # Middle section - Controls (fixed width)
         controls_section = QWidget()
         controls_section.setFixedWidth(420)  # Further increased width for controls
         controls_section.setStyleSheet("""
             QWidget {
-                background-color: rgba(30, 30, 30, 0.8);
+                background-color: rgba(0, 0, 0, 0.4);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 0px;
-                margin: 0px;
+                border-radius: 4px;
+                margin: 2px;
             }
         """)
         controls_layout = QVBoxLayout(controls_section)
-        controls_layout.setContentsMargins(0, 0, 0, 0)
-        controls_layout.setSpacing(0)
+        controls_layout.setContentsMargins(6, 6, 6, 6)
+        controls_layout.setSpacing(6)
         
         # Initialize device controls
         self.initialize_device_controls()
@@ -262,15 +262,15 @@ class HomeViewerApp(QMainWindow):
         viewer_section = QWidget()
         viewer_section.setStyleSheet("""
             QWidget {
-                background-color: rgba(30, 30, 30, 0.8);
+                background-color: rgba(0, 0, 0, 0.4);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 0px;
-                margin: 0px;
+                border-radius: 4px;
+                margin: 2px;
             }
         """)
         viewer_layout = QVBoxLayout(viewer_section)
-        viewer_layout.setContentsMargins(0, 0, 0, 0)
-        viewer_layout.setSpacing(0)
+        viewer_layout.setContentsMargins(6, 6, 6, 6)
+        viewer_layout.setSpacing(6)
         
         # Create view switcher
         self.create_view_switcher(viewer_layout)
@@ -339,7 +339,7 @@ class HomeViewerApp(QMainWindow):
         header_widget = QWidget()
         header_widget.setStyleSheet("""
             QWidget {
-                background-color: rgba(40, 40, 40, 0.9);
+                background-color: rgba(0, 0, 0, 0.5);
                 border: 1px solid rgba(255, 255, 255, 0.2);
                 border-radius: 0px;
                 padding: 8px;
@@ -611,7 +611,7 @@ class HomeViewerApp(QMainWindow):
         for i, (tab_name, tab_id, icon_type) in enumerate(tabs):
             btn = QPushButton()
             btn.setCheckable(True)
-            btn.setFixedSize(40, 40)  # Even smaller square buttons for vertical layout
+            btn.setFixedSize(35, 35)  # Compact square buttons for vertical layout
             btn.setIcon(self.create_tab_icon(icon_type, 18))
             btn.setIconSize(QSize(18, 18))
             btn.setToolTip(tab_name)  # Show name on hover
@@ -645,7 +645,7 @@ class HomeViewerApp(QMainWindow):
         
         # Add settings button at the very bottom
         self.settings_button = QPushButton("⋮")
-        self.settings_button.setFixedSize(40, 40)  # Same size as other tab buttons
+        self.settings_button.setFixedSize(35, 35)  # Same size as other tab buttons
         self.settings_button.setStyleSheet("""
             QPushButton {
                 background-color: rgba(50, 50, 50, 0.8);
@@ -679,11 +679,12 @@ class HomeViewerApp(QMainWindow):
         self.content_area = QWidget()
         self.content_area.setStyleSheet("""
             QWidget {
-                background-color: transparent;
+                background-color: rgba(0, 0, 0, 0.1);
             }
         """)
         self.content_layout = QVBoxLayout(self.content_area)
-        self.content_layout.setContentsMargins(8, 8, 8, 8)
+        self.content_layout.setContentsMargins(12, 12, 12, 12)
+        self.content_layout.setSpacing(8)
         
         # Create tab pages
         self.create_overview_tab()
@@ -960,7 +961,7 @@ class HomeViewerApp(QMainWindow):
         status_group = QWidget()
         status_group.setStyleSheet("""
             QWidget {
-                background-color: rgba(60, 60, 60, 0.3);
+                background-color: rgba(0, 0, 0, 0.3);
                 border-radius: 0px;
                 padding: 10px;
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1473,7 +1474,7 @@ class HomeViewerApp(QMainWindow):
         self.status_bar = QStatusBar()
         self.status_bar.setStyleSheet("""
             QStatusBar {
-                background-color: rgba(30, 30, 30, 0.9);
+                background-color: rgba(0, 0, 0, 0.7);
                 border-top: 1px solid rgba(255, 255, 255, 0.1);
                 color: #E0E0E0;
                 font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -2131,7 +2132,7 @@ class SettingsDialog(QDialog):
         # Set dialog background
         self.setStyleSheet("""
             QDialog {
-                background-color: #2b2b2b;
+                background-color: rgba(0, 0, 0, 0.8);
             }
             QLabel {
                 color: #ffffff;
