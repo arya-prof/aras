@@ -214,50 +214,76 @@ class HomeViewerApp(QMainWindow):
         """)
         self.setCentralWidget(central_widget)
         
-        # Main layout - horizontal split
+        # Main layout - horizontal split (tabs, controls, viewer)
         main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # Left side - Controls (50% of width)
-        left_panel = QWidget()
-        left_panel.setStyleSheet("""
+        # Left section - Tabs (fixed width)
+        tabs_section = QWidget()
+        tabs_section.setFixedWidth(80)  # Fixed width for tabs only
+        tabs_section.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 0.9);
+                border: transparent;
+                border-radius: 0px;
+                margin: 0px;
+            }
+        """)
+        tabs_layout = QVBoxLayout(tabs_section)
+        tabs_layout.setContentsMargins(0, 0, 0, 0)
+        tabs_layout.setSpacing(0)
+        
+        # Middle section - Controls (fixed width)
+        controls_section = QWidget()
+        controls_section.setFixedWidth(300)  # Fixed width for controls
+        controls_section.setStyleSheet("""
             QWidget {
                 background-color: rgba(30, 30, 30, 0.8);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
-                margin: 5px;
+                margin: 0px;
             }
         """)
-        left_layout = QVBoxLayout(left_panel)
+        controls_layout = QVBoxLayout(controls_section)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(0)
         
         # Initialize device controls
         self.initialize_device_controls()
         
-        # Create tabbed interface
-        self.create_tabbed_interface(left_layout)
+        # Create tabbed interface (tabs only)
+        self.create_tabbed_interface(tabs_layout)
         
-        # Right side - Viewer (50% of width)
-        right_panel = QWidget()
-        right_panel.setStyleSheet("""
+        # Create controls interface
+        self.create_controls_interface(controls_layout)
+        
+        # Right section - Viewer (stretches to fill remaining space)
+        viewer_section = QWidget()
+        viewer_section.setStyleSheet("""
             QWidget {
                 background-color: rgba(30, 30, 30, 0.8);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
-                margin: 5px;
+                margin: 0px;
             }
         """)
-        right_layout = QVBoxLayout(right_panel)
+        viewer_layout = QVBoxLayout(viewer_section)
+        viewer_layout.setContentsMargins(0, 0, 0, 0)
+        viewer_layout.setSpacing(0)
         
         # Create view switcher
-        self.create_view_switcher(right_layout)
+        self.create_view_switcher(viewer_layout)
         
         # Create stacked widget for views
         self.stacked_widget = QWidget()
         self.stacked_layout = QHBoxLayout(self.stacked_widget)
-        right_layout.addWidget(self.stacked_widget, 1)  # Add stretch factor to fill space
+        viewer_layout.addWidget(self.stacked_widget, 1)  # Add stretch factor to fill space
         
-        # Add panels to main layout with equal stretch
-        main_layout.addWidget(left_panel, 1)  # 50% width
-        main_layout.addWidget(right_panel, 1)  # 50% width
+        # Add sections to main layout
+        main_layout.addWidget(tabs_section, 0)  # Fixed width for tabs
+        main_layout.addWidget(controls_section, 0)  # Fixed width for controls
+        main_layout.addWidget(viewer_section, 1)  # Stretch to fill remaining space
         
         # Create 3D panel
         self.create_3d_panel()
@@ -427,28 +453,6 @@ class HomeViewerApp(QMainWindow):
         """)
         user_controls_layout.addWidget(export_btn)
         
-        # Settings button
-        self.settings_button = QPushButton("⋮")
-        self.settings_button.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #E0E0E0;
-                font-weight: bold;
-                font-size: 14px;
-                padding: 4px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                border-radius: 0px;
-                min-width: 24px;
-                min-height: 24px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: #4CAF50;
-            }
-        """)
-        self.settings_button.setToolTip("Settings")
-        self.settings_button.clicked.connect(self.open_settings)
-        user_controls_layout.addWidget(self.settings_button)
         
         header_layout.addLayout(user_controls_layout)
         
@@ -578,27 +582,12 @@ class HomeViewerApp(QMainWindow):
         return QIcon(pixmap)
 
     def create_tabbed_interface(self, parent_layout):
-        """Create the tabbed interface organized by rooms."""
-        # Create main container for vertical layout
-        main_container = QWidget()
-        main_container.setStyleSheet("""
-            QWidget {
-                background-color: transparent;
-            }
-        """)
-        main_layout = QHBoxLayout(main_container)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        
+        """Create the tabbed interface (tabs only)."""
         # Create vertical tab bar
         self.tab_bar = QWidget()
-        self.tab_bar.setFixedWidth(80)  # Reduced width for icon-only tabs
         self.tab_bar.setStyleSheet("""
             QWidget {
-                background-color: rgba(40, 40, 40, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 0px;
-                margin-right: 5px;
+                background-color: transparent;
             }
         """)
         tab_bar_layout = QVBoxLayout(self.tab_bar)
@@ -607,7 +596,6 @@ class HomeViewerApp(QMainWindow):
         
         # Create tab buttons
         self.tab_buttons = []
-        self.tab_pages = {}
         
         # Tab definitions with icon types
         tabs = [
@@ -623,7 +611,7 @@ class HomeViewerApp(QMainWindow):
         for i, (tab_name, tab_id, icon_type) in enumerate(tabs):
             btn = QPushButton()
             btn.setCheckable(True)
-            btn.setFixedSize(60, 60)  # Square buttons for icons
+            btn.setFixedSize(60, 60)  # Square buttons for vertical layout
             btn.setIcon(self.create_tab_icon(icon_type, 32))
             btn.setIconSize(QSize(32, 32))
             btn.setToolTip(tab_name)  # Show name on hover
@@ -654,15 +642,44 @@ class HomeViewerApp(QMainWindow):
             tab_bar_layout.addWidget(btn)
         
         tab_bar_layout.addStretch()
-        main_layout.addWidget(self.tab_bar)
         
+        # Add settings button at the very bottom
+        self.settings_button = QPushButton("⋮")
+        self.settings_button.setFixedSize(60, 60)  # Same size as other tab buttons
+        self.settings_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(50, 50, 50, 0.8);
+                color: #E0E0E0;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 0px;
+                padding: 4px;
+                font-size: 24px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(60, 60, 60, 0.9);
+                color: #4CAF50;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+            }
+            QPushButton:pressed {
+                background-color: rgba(76, 175, 80, 0.8);
+                color: #ffffff;
+                border: 1px solid rgba(76, 175, 80, 0.6);
+            }
+        """)
+        self.settings_button.setToolTip("Settings")
+        self.settings_button.clicked.connect(self.open_settings)
+        tab_bar_layout.addWidget(self.settings_button)
+        
+        parent_layout.addWidget(self.tab_bar)
+    
+    def create_controls_interface(self, parent_layout):
+        """Create the controls interface with all tab content."""
         # Create content area
         self.content_area = QWidget()
         self.content_area.setStyleSheet("""
             QWidget {
-                background-color: rgba(30, 30, 30, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 0px;
+                background-color: transparent;
             }
         """)
         self.content_layout = QVBoxLayout(self.content_area)
@@ -693,8 +710,7 @@ class HomeViewerApp(QMainWindow):
         self.tab_buttons[0].setChecked(True)
         self.show_tab_content("overview")
         
-        main_layout.addWidget(self.content_area, 1)
-        parent_layout.addWidget(main_container)
+        parent_layout.addWidget(self.content_area)
     
     def switch_tab(self, tab_index):
         """Switch to a different tab."""
