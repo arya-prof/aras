@@ -362,7 +362,7 @@ class HomeViewerApp(QMainWindow):
             }
             QPushButton:hover {
                 background: rgba(255, 255, 255, 0.1);
-                color: #4CAF50;
+                color: #f44336;
             }
         """)
         header_layout.addWidget(back_btn)
@@ -428,7 +428,7 @@ class HomeViewerApp(QMainWindow):
             }
             QPushButton:hover {
                 background: rgba(255, 255, 255, 0.1);
-                color: #4CAF50;
+                color: #f44336;
             }
         """)
         user_controls_layout.addWidget(refresh_btn)
@@ -448,7 +448,7 @@ class HomeViewerApp(QMainWindow):
             }
             QPushButton:hover {
                 background: rgba(255, 255, 255, 0.1);
-                color: #4CAF50;
+                color: #f44336;
             }
         """)
         user_controls_layout.addWidget(export_btn)
@@ -624,17 +624,17 @@ class HomeViewerApp(QMainWindow):
                     padding: 4px;
                 }
                 QPushButton:checked {
-                    background-color: rgba(76, 175, 80, 0.8);
+                    background-color: rgba(244, 67, 54, 0.8);
                     color: #ffffff;
-                    border: 1px solid rgba(76, 175, 80, 0.6);
+                    border: 1px solid rgba(244, 67, 54, 0.6);
                 }
                 QPushButton:hover {
-                    background-color: rgba(60, 60, 60, 0.9);
+                    background-color: rgba(244, 67, 54, 0.8);
                     color: #ffffff;
-                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    border: 1px solid rgba(244, 67, 54, 0.6);
                 }
                 QPushButton:checked:hover {
-                    background-color: rgba(76, 175, 80, 0.9);
+                    background-color: rgba(244, 67, 54, 0.9);
                 }
             """)
             btn.clicked.connect(lambda checked, idx=i: self.switch_tab(idx))
@@ -657,9 +657,9 @@ class HomeViewerApp(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: rgba(60, 60, 60, 0.9);
-                color: #4CAF50;
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                background-color: rgba(244, 67, 54, 0.8);
+                color: #ffffff;
+                border: 1px solid rgba(244, 67, 54, 0.6);
             }
             QPushButton:pressed {
                 background-color: rgba(76, 175, 80, 0.8);
@@ -1267,13 +1267,13 @@ class HomeViewerApp(QMainWindow):
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #4CAF50, stop:1 #45a049);
-                border: 1px solid rgba(76, 175, 80, 0.6);
+                    stop:0 #f44336, stop:1 #d32f2f);
+                border: 1px solid rgba(244, 67, 54, 0.6);
                 color: #ffffff;
             }
             QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #3d8b40, stop:1 #357a38);
+                    stop:0 #d32f2f, stop:1 #b71c1c);
             }
         """
     
@@ -1351,22 +1351,22 @@ class HomeViewerApp(QMainWindow):
             return """
                 QPushButton {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #4CAF50, stop:1 #45a049);
+                        stop:0 #f44336, stop:1 #d32f2f);
                     color: #ffffff;
                     font-weight: bold;
                     font-size: 10px;
-                    border: 2px solid #4CAF50;
+                    border: 2px solid #f44336;
                     border-radius: 0px;
                     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
                 }
                 QPushButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #5CBF60, stop:1 #55b059);
-                    border: 2px solid #5CBF60;
+                        stop:0 #ff5722, stop:1 #e64a19);
+                    border: 2px solid #ff5722;
                 }
                 QPushButton:pressed {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #3d8b40, stop:1 #357a38);
+                        stop:0 #d32f2f, stop:1 #b71c1c);
                 }
             """
         else:
@@ -2079,7 +2079,7 @@ class SettingsDialog(QDialog):
         apply_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #4CAF50, stop:1 #45a049);
+                    stop:0 #f44336, stop:1 #d32f2f);
                 color: #ffffff;
                 font-weight: bold;
                 font-size: 14px;
@@ -2090,11 +2090,11 @@ class SettingsDialog(QDialog):
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #5CBF60, stop:1 #55b059);
+                    stop:0 #ff5722, stop:1 #e64a19);
             }
             QPushButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #3d8b40, stop:1 #357a38);
+                    stop:0 #d32f2f, stop:1 #b71c1c);
             }
         """)
         apply_btn.clicked.connect(self.apply_settings)
