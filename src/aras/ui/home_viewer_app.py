@@ -221,7 +221,7 @@ class HomeViewerApp(QMainWindow):
         
         # Left section - Tabs (fixed width)
         tabs_section = QWidget()
-        tabs_section.setFixedWidth(80)  # Fixed width for tabs only
+        tabs_section.setFixedWidth(60)  # Reduced width to fit smaller buttons
         tabs_section.setStyleSheet("""
             QWidget {
                 background-color: rgba(40, 40, 40, 0.9);
@@ -236,7 +236,7 @@ class HomeViewerApp(QMainWindow):
         
         # Middle section - Controls (fixed width)
         controls_section = QWidget()
-        controls_section.setFixedWidth(300)  # Fixed width for controls
+        controls_section.setFixedWidth(420)  # Further increased width for controls
         controls_section.setStyleSheet("""
             QWidget {
                 background-color: rgba(30, 30, 30, 0.8);
@@ -408,7 +408,7 @@ class HomeViewerApp(QMainWindow):
             padding: 4px 8px;
             background-color: rgba(60, 60, 60, 0.7);
             border-radius: 0px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: transparent;
         """)
         user_controls_layout.addWidget(user_initials)
         
@@ -611,9 +611,9 @@ class HomeViewerApp(QMainWindow):
         for i, (tab_name, tab_id, icon_type) in enumerate(tabs):
             btn = QPushButton()
             btn.setCheckable(True)
-            btn.setFixedSize(60, 60)  # Square buttons for vertical layout
-            btn.setIcon(self.create_tab_icon(icon_type, 32))
-            btn.setIconSize(QSize(32, 32))
+            btn.setFixedSize(40, 40)  # Even smaller square buttons for vertical layout
+            btn.setIcon(self.create_tab_icon(icon_type, 18))
+            btn.setIconSize(QSize(18, 18))
             btn.setToolTip(tab_name)  # Show name on hover
             btn.setStyleSheet("""
                 QPushButton {
@@ -645,7 +645,7 @@ class HomeViewerApp(QMainWindow):
         
         # Add settings button at the very bottom
         self.settings_button = QPushButton("⋮")
-        self.settings_button.setFixedSize(60, 60)  # Same size as other tab buttons
+        self.settings_button.setFixedSize(40, 40)  # Same size as other tab buttons
         self.settings_button.setStyleSheet("""
             QPushButton {
                 background-color: rgba(50, 50, 50, 0.8);
@@ -653,7 +653,7 @@ class HomeViewerApp(QMainWindow):
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
                 padding: 4px;
-                font-size: 24px;
+                font-size: 16px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -748,8 +748,8 @@ class HomeViewerApp(QMainWindow):
         overview_layout.setContentsMargins(12, 12, 12, 12)
         overview_layout.setSpacing(8)
         
-        # Overview header with futuristic styling
-        overview_header = QLabel("Agent Allocation")
+        # Overview header
+        overview_header = QLabel("Device Controls")
         overview_header.setStyleSheet("""
             font-size: 18px;
             font-weight: bold;
@@ -758,181 +758,6 @@ class HomeViewerApp(QMainWindow):
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         """)
         overview_layout.addWidget(overview_header)
-        
-        # Agent statistics display
-        stats_widget = QWidget()
-        stats_widget.setStyleSheet("""
-            QWidget {
-                background-color: rgba(40, 40, 40, 0.8);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 0px;
-                padding: 12px;
-            }
-        """)
-        stats_layout = QHBoxLayout(stats_widget)
-        
-        # Large numbers display
-        self.active_field_label = QLabel("190")
-        self.active_field_label.setStyleSheet("""
-            font-size: 32px;
-            font-weight: bold;
-            color: #4CAF50;
-            padding: 8px;
-            text-align: center;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        stats_layout.addWidget(self.active_field_label)
-        
-        self.undercover_label = QLabel("990")
-        self.undercover_label.setStyleSheet("""
-            font-size: 32px;
-            font-weight: bold;
-            color: #2196F3;
-            padding: 8px;
-            text-align: center;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        stats_layout.addWidget(self.undercover_label)
-        
-        self.training_label = QLabel("290")
-        self.training_label.setStyleSheet("""
-            font-size: 32px;
-            font-weight: bold;
-            color: #FF9800;
-            padding: 8px;
-            text-align: center;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        stats_layout.addWidget(self.training_label)
-        
-        overview_layout.addWidget(stats_widget)
-        
-        # Labels for the numbers
-        labels_layout = QHBoxLayout()
-        labels_layout.addWidget(QLabel("Active Field.."))
-        labels_layout.addWidget(QLabel("Undercover.."))
-        labels_layout.addWidget(QLabel("Training.."))
-        for i in range(labels_layout.count()):
-            label = labels_layout.itemAt(i).widget()
-            label.setStyleSheet("""
-                font-size: 12px;
-                color: #888888;
-                text-align: center;
-                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            """)
-        overview_layout.addLayout(labels_layout)
-        
-        # Mission Information section
-        mission_header = QLabel("Mission Information")
-        mission_header.setStyleSheet("""
-            font-size: 16px;
-            font-weight: bold;
-            color: #E0E0E0;
-            padding: 15px 0px 8px 0px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        overview_layout.addWidget(mission_header)
-        
-        # Mission stats widget
-        mission_widget = QWidget()
-        mission_widget.setStyleSheet("""
-            QWidget {
-                background-color: rgba(40, 40, 40, 0.8);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 0px;
-                padding: 12px;
-            }
-        """)
-        mission_layout = QVBoxLayout(mission_widget)
-        
-        # Successful missions
-        success_layout = QHBoxLayout()
-        success_icon = QLabel("►")
-        success_icon.setStyleSheet("""
-            font-size: 14px;
-            color: #4CAF50;
-            font-weight: bold;
-            padding: 4px;
-        """)
-        success_layout.addWidget(success_icon)
-        
-        success_label = QLabel("Successful Missions")
-        success_label.setStyleSheet("""
-            font-size: 14px;
-            color: #E0E0E0;
-            font-weight: bold;
-            padding: 4px;
-        """)
-        success_layout.addWidget(success_label)
-        success_layout.addStretch()
-        mission_layout.addLayout(success_layout)
-        
-        # Mission breakdown
-        mission_breakdown = QWidget()
-        breakdown_layout = QHBoxLayout(mission_breakdown)
-        
-        # High Risk
-        high_risk_layout = QVBoxLayout()
-        high_risk_label = QLabel("High Risk Mission")
-        high_risk_label.setStyleSheet("""
-            font-size: 12px;
-            color: #888888;
-            text-align: center;
-        """)
-        high_risk_number = QLabel("190")
-        high_risk_number.setStyleSheet("""
-            font-size: 24px;
-            font-weight: bold;
-            color: #E0E0E0;
-            text-align: center;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        high_risk_layout.addWidget(high_risk_number)
-        high_risk_layout.addWidget(high_risk_label)
-        breakdown_layout.addLayout(high_risk_layout)
-        
-        # Medium Risk
-        medium_risk_layout = QVBoxLayout()
-        medium_risk_label = QLabel("Medium Risk Mission")
-        medium_risk_label.setStyleSheet("""
-            font-size: 12px;
-            color: #888888;
-            text-align: center;
-        """)
-        medium_risk_number = QLabel("426")
-        medium_risk_number.setStyleSheet("""
-            font-size: 24px;
-            font-weight: bold;
-            color: #E0E0E0;
-            text-align: center;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        medium_risk_layout.addWidget(medium_risk_number)
-        medium_risk_layout.addWidget(medium_risk_label)
-        breakdown_layout.addLayout(medium_risk_layout)
-        
-        # Low Risk
-        low_risk_layout = QVBoxLayout()
-        low_risk_label = QLabel("Low Risk Mission")
-        low_risk_label.setStyleSheet("""
-            font-size: 12px;
-            color: #888888;
-            text-align: center;
-        """)
-        low_risk_number = QLabel("920")
-        low_risk_number.setStyleSheet("""
-            font-size: 24px;
-            font-weight: bold;
-            color: #E0E0E0;
-            text-align: center;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        low_risk_layout.addWidget(low_risk_number)
-        low_risk_layout.addWidget(low_risk_label)
-        breakdown_layout.addLayout(low_risk_layout)
-        
-        mission_layout.addWidget(mission_breakdown)
-        overview_layout.addWidget(mission_widget)
         
         # Global controls
         global_controls_layout = QHBoxLayout()
@@ -961,16 +786,6 @@ class HomeViewerApp(QMainWindow):
         """)
         global_controls_layout.addWidget(self.device_count_label)
         
-        # Arduino status
-        self.arduino_status_label = QLabel("Arduino: Disconnected")
-        self.arduino_status_label.setStyleSheet("""
-            font-size: 12px;
-            color: #f44336;
-            font-weight: bold;
-            padding: 5px 0px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        """)
-        global_controls_layout.addWidget(self.arduino_status_label)
         global_controls_layout.addStretch()
         
         overview_layout.addLayout(global_controls_layout)
@@ -1690,6 +1505,18 @@ class HomeViewerApp(QMainWindow):
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         """)
         self.status_bar.addPermanentWidget(self.connection_status)
+        
+        self.status_bar.addPermanentWidget(QLabel("|"))
+        
+        # Arduino status
+        self.arduino_status_label = QLabel("Arduino: Disconnected")
+        self.arduino_status_label.setStyleSheet("""
+            font-size: 11px;
+            color: #f44336;
+            font-weight: bold;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        """)
+        self.status_bar.addPermanentWidget(self.arduino_status_label)
         
         self.status_bar.addPermanentWidget(QLabel("|"))
         
