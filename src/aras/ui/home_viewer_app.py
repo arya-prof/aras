@@ -643,7 +643,7 @@ class HomeViewerApp(QMainWindow):
             btn.setToolTip(tab_name)  # Show name on hover
             btn.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(50, 50, 50, 0.8);
+                    background-color: transparent;
                     color: #E0E0E0;
                     border: 1px solid rgba(255, 255, 255, 0.1);
                     border-radius: 0px;
@@ -674,7 +674,7 @@ class HomeViewerApp(QMainWindow):
         self.settings_button.setFixedSize(35, 35)  # Same size as other tab buttons
         self.settings_button.setStyleSheet("""
             QPushButton {
-                background-color: rgba(50, 50, 50, 0.8);
+                background-color: transparent;
                 color: #E0E0E0;
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 0px;
