@@ -216,8 +216,8 @@ class HomeViewerApp(QMainWindow):
         
         # Main layout - horizontal split (tabs, controls, viewer)
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-        main_layout.setSpacing(8)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
         # Left section - Tabs (fixed width)
         tabs_section = QWidget()
@@ -242,9 +242,9 @@ class HomeViewerApp(QMainWindow):
         controls_section.setStyleSheet("""
             #controls_section {
                 background-color: rgba(0, 0, 0, 0.4);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 4px;
-                margin: 2px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 0px;
+                margin: 0px;
             }
         """)
         controls_layout = QVBoxLayout(controls_section)
@@ -265,9 +265,9 @@ class HomeViewerApp(QMainWindow):
         viewer_section.setStyleSheet("""
             QWidget {
                 background-color: rgba(0, 0, 0, 0.4);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 4px;
-                margin: 2px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 0px;
+                margin: 0px;
             }
         """)
         viewer_layout = QVBoxLayout(viewer_section)
