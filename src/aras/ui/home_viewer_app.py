@@ -221,11 +221,12 @@ class HomeViewerApp(QMainWindow):
         
         # Left section - Tabs (fixed width)
         tabs_section = QWidget()
+        tabs_section.setObjectName("tabs_section")
         tabs_section.setFixedWidth(45)  # Further reduced width for more compact layout
         tabs_section.setStyleSheet("""
-            QWidget {
+            #tabs_section {
                 background-color: transparent;
-                border: transparent;
+                border: none;
                 border-radius: 0px;
                 margin: 0px;
             }
@@ -236,9 +237,10 @@ class HomeViewerApp(QMainWindow):
         
         # Middle section - Controls (fixed width)
         controls_section = QWidget()
+        controls_section.setObjectName("controls_section")
         controls_section.setFixedWidth(420)  # Further increased width for controls
         controls_section.setStyleSheet("""
-            QWidget {
+            #controls_section {
                 background-color: rgba(0, 0, 0, 0.4);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 4px;
