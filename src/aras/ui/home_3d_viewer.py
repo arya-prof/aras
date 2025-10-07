@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QSlider, 
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtOpenGL import QOpenGLShader, QOpenGLShaderProgram
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QMouseEvent, QWheelEvent, QKeyEvent
+from PyQt6.QtGui import QMouseEvent, QWheelEvent, QKeyEvent, QSurfaceFormat
 
 try:
     import trimesh
@@ -35,6 +35,12 @@ class Home3DViewer(QOpenGLWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
+        # Enable transparent background for the OpenGL widget
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        fmt = QSurfaceFormat()
+        fmt.setAlphaBufferSize(8)
+        self.setFormat(fmt)
+
         # Camera parameters
         self.camera_distance = 3.0
         self.camera_angle_x = math.radians(90)  # 90 degrees
@@ -235,9 +241,11 @@ class Home3DViewer(QOpenGLWidget):
         GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glEnable(GL.GL_CULL_FACE)
         GL.glCullFace(GL.GL_BACK)
+        GL.glEnable(GL.GL_BLEND)
+        GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
         
         # Set clear color
-        GL.glClearColor(0.1, 0.1, 0.2, 1.0)
+        GL.glClearColor(0.0, 0.0, 0.0, 0.0)
         
         # Create shader program
         self.create_shader_program()
