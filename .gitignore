@@ -87,3 +87,21 @@ tmp/
 # Screenshots
 screenshot_*.png
 camera_*.jpg
+
+# Web Frontend (Next.js/Node.js)
+web-frontend/node_modules/
+web-frontend/.next/
+web-frontend/out/
+web-frontend/build/
+web-frontend/dist/
+web-frontend/.env
+web-frontend/.env.local
+web-frontend/.env.development.local
+web-frontend/.env.test.local
+web-frontend/.env.production.local
+web-frontend/npm-debug.log*
+web-frontend/yarn-debug.log*
+web-frontend/yarn-error.log*
+web-frontend/.pnpm-debug.log*
+web-frontend/.vercel
+web-frontend/.turbo

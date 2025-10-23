@@ -10,6 +10,9 @@ from typing import Dict, List, Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
 from loguru import logger
 
 from .config import settings
@@ -134,6 +137,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Configure static file serving for React frontend BEFORE any routes
+frontend_build_path = Path(__file__).parent.parent.parent / "web-frontend" / "out"
+if frontend_build_path.exists():
+    # Mount static files for Next.js assets
+    app.mount("/_next", StaticFiles(directory=frontend_build_path / "_next"), name="next")
+    # Mount other static files
+    app.mount("/static", StaticFiles(directory=frontend_build_path), name="static")
+
 # WebSocket manager instance
 manager = WebSocketManager()
 
@@ -159,13 +170,37 @@ async def shutdown_event():
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
-    return {
-        "message": f"Welcome to {settings.agent_name} Agent API",
-        "version": "0.1.0",
-        "status": "running",
-        "websocket_url": f"ws://localhost:{settings.http_port}/ws"
-    }
+    """Root endpoint - serve React frontend if available, otherwise API info."""
+    frontend_index = frontend_build_path / "index.html"
+    if frontend_index.exists():
+        return FileResponse(frontend_index)
+    else:
+        return {
+            "message": f"Welcome to {settings.agent_name} Agent API",
+            "version": "0.1.0",
+            "status": "running",
+            "websocket_url": f"ws://localhost:{settings.http_port}/ws",
+            "note": "React frontend not built. Run 'npm run build' in web-frontend directory."
+        }
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon."""
+    favicon_path = frontend_build_path / "favicon.ico"
+    if favicon_path.exists():
+        return FileResponse(favicon_path)
+    else:
+        raise HTTPException(status_code=404, detail="Favicon not found")
+
+# This route should be last to avoid intercepting static files
+@app.get("/{path:path}")
+async def serve_frontend(path: str):
+    """Serve React frontend for all routes (SPA routing)."""
+    frontend_index = frontend_build_path / "index.html"
+    if frontend_index.exists():
+        return FileResponse(frontend_index)
+    else:
+        raise HTTPException(status_code=404, detail="Frontend not found")
 
 
 @app.get("/health")
